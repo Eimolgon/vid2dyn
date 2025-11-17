@@ -1,0 +1,12 @@
+*.pt
+*.log
+*.aux
+*.bbl
+*.toc
+*.blg
+*.out
+*.vscode
+
+runs/
+output/
+_pycache_
