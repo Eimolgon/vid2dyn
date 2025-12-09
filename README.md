@@ -33,6 +33,7 @@ TO - DO
 - [ ] Compare angle from points and from reconstruction
 - [ ] Test reconstruction accuracy
 - [ ] More points == more accuracy?
+- [ ] Check dependencies
 
 
 Directory structure

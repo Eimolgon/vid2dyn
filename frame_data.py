@@ -2,6 +2,7 @@ import os
 import json
 import math
 import random
+import datetime
 import numpy as np
 import sympy as sp
 import sympy.physics.mechanics as me
@@ -45,19 +46,21 @@ def fitEllipse(points, screen_res):
 
     ell = EllipseModel()
     ell.estimate(points)
-    xc, yc, a, b, theta = ell.params
+    x, z, a, b, theta = ell.params
 
-    xc = xc*screen_res[0]
-    yc = screen_res[1]*(1-yc)
+    x = x*screen_res[0]
+    z = screen_res[1]*(1-z)
     a = a*screen_res[1]
     b = b*screen_res[0]
 
-    if b < a:
-        angle2camera = np.arccos(b/a)
+    if b <= a:
+        q1 = np.arccos(b/a)
+        q2 = 0
     else:
-        angle2camera = 0
+        q1 = 0
+        q2 = np.arccos(a/b)
 
-    ellipse_data = (xc, yc, a, b, theta, angle2camera)
+    ellipse_data = (x, z, a, b, theta, q1, q2)
 
     # Unit test -----
     b_test = 10
@@ -184,10 +187,13 @@ def animate2d(data, resolution, first_frame):
     ani2d = animation.FuncAnimation(fig=fig, func=update, frames=len(xf), interval=60)
     plt.show()
 
+    if save == True:
+        ani2d.save(filename=f"{filename}-animation-{date}.gif")
+
     return
 
 
-def animate3d(data, resolution, first_frame):
+def animate3d(data, resolution, first_frame, save=False):
     '''
     Create 3d animation
     '''
@@ -269,11 +275,86 @@ def animate3d(data, resolution, first_frame):
 
 
     ani3d = animation.FuncAnimation(fig=fig, func=update, frames=len(xf), interval=60)
-    # ani3d.save(filename="yt-crash-005-animation-021125.gif")
+    plt.show()
+
+    if save == True:
+        ani3d.save(filename=f"{filename}-animation-{date}.gif")
 
     return
 
 
+def data4model(track_data, assumed_origin):
+    '''
+    Create the nested dictionary by frame for the data required in the model of the bicycle
+    '''
+
+    data = {
+        'Ry_x':0,
+        'Ry_z':0,
+        'Fy_x':0,
+        'Fy_z':0,
+        'r_Cf_Cr_x':0,
+        'r_Cf_Cr_z':0,
+        'r_Cr_O_x':0,
+        'r_Cr_O_z':0,
+        'r_P_S_x':0,
+        'r_P_S_z':0
+    }
+
+    rear_wheel = {
+        'x': 0,
+        'z': 0,
+        'psi': 0
+    }
+
+
+    ellipse_f = np.array(track_data[0]['ellipses'])
+    ellipse_r = np.array(track_data[1]['ellipses'])
+
+    x_f = np.array(ellipse_f[:,0])
+    z_f = np.array(ellipse_f[:,1])
+    theta_f = ellipse_f[:,4]
+    q1_f = ellipse_f[:,5]
+    q2_f = ellipse_f[:,6]
+
+
+    ellipse_f_data = [x_f, z_f, theta_f, q1_f, q2_f]
+
+
+    x_r = np.array(ellipse_r[:,0])
+    z_r = np.array(ellipse_r[:,1])
+    theta_r = ellipse_r[:,4]
+    q1_r = ellipse_r[:,5]
+    q2_r = ellipse_r[:,6]
+
+    ellipse_r_data = [x_r, z_r, theta_r, q1_r, q2_r]
+    
+
+    ellipses_data = [ellipse_r_data, ellipse_f_data]
+
+    rear_wheel['x'] = x_r
+    rear_wheel['z'] = z_r
+    rear_wheel['psi'] = angle_cam_r
+
+    data['Ry_x'] = np.sin(angle_cam_r)*np.cos(theta_r)
+    data['Ry_z'] = np.sin(angle_cam_r)*np.sin(theta_r)
+
+    data['Fy_x'] = np.sin(angle_cam_f)*np.cos(theta_f)
+    data['Fy_z'] = np.sin(angle_cam_f)*np.sin(theta_f)
+
+    data['r_Cf_Cr_x'] = x_f - x_r
+    data['r_Cf_Cr_z'] = z_f - z_r
+    data['r_Cr_O_x'] = x_r - assumed_origin[0]
+    data['r_Cr_O_z'] = z_r - assumed_origin[1]
+    data['r_P_S_x'] = (np.sin(angle_cam_f)*np.cos(angle_cam_r) - np.sin(angle_cam_r)*np.cos(angle_cam_f)*np.cos(theta_f - theta_r))*np.sin(theta_f)/np.sqrt((np.sin(angle_cam_f)*np.cos(angle_cam_r) - np.sin(angle_cam_r)*np.cos(angle_cam_f)*np.cos(theta_f - theta_r))**2 + np.sin(angle_cam_r)**2*np.sin(theta_f - theta_r)**2) + np.sin(angle_cam_r)*np.sin(theta_f - theta_r)*np.cos(angle_cam_f)*np.cos(theta_f)/np.sqrt((np.sin(angle_cam_f)*np.cos(angle_cam_r) - np.sin(angle_cam_r)*np.cos(angle_cam_f)*np.cos(theta_f - theta_r))**2 + np.sin(angle_cam_r)**2*np.sin(theta_f - theta_r)**2)
+    data['r_P_S_z'] = (np.sin(angle_cam_f)*np.cos(angle_cam_r) - np.sin(angle_cam_r)*np.cos(angle_cam_f)*np.cos(theta_f - theta_r))*np.cos(theta_f)/np.sqrt((np.sin(angle_cam_f)*np.cos(angle_cam_r) - np.sin(angle_cam_r)*np.cos(angle_cam_f)*np.cos(theta_f - theta_r))**2 + np.sin(angle_cam_r)**2*np.sin(theta_f - theta_r)**2) - np.sin(angle_cam_r)*np.sin(theta_f)*np.sin(theta_f - theta_r)*np.cos(angle_cam_f)/np.sqrt((np.sin(angle_cam_f)*np.cos(angle_cam_r) - np.sin(angle_cam_r)*np.cos(angle_cam_f)*np.cos(theta_f - theta_r))**2 + np.sin(angle_cam_r)**2*np.sin(theta_f - theta_r)**2)
+
+    data_json = clean4json(data)
+    rw_json = clean4json(rear_wheel)
+
+    
+
+    return data_json, ellipse_r, ellipse_f
 
 
 # ----- Tests -----
@@ -281,6 +362,10 @@ def animate3d(data, resolution, first_frame):
 
 
 # ----- Run -----
+
+rawdate = datetime.datetime.now()
+date =  rawdate.strftime('%Y') + rawdate.strftime('%m') + rawdate.strftime('%d')
+
 
 imgdata = {
     'Ry_x': np.sin(cam_angle_r)*np.cos(theta_r),

@@ -7,8 +7,8 @@ generative AI.
 single_state.ipynb
 ------------------
 
-- Function `readEllipse` was made using DeepSeek free version, with no
-further modifications.
+- Function `readEllipse` was made using DeepSeek free version. Final version 
+of the code was modified.
 
 - Function `recreateEllipse` was made using Microsoft Copilot enterprise
 version. Final version of the code was modified.
