@@ -1,11 +1,8 @@
 # .pre-commit-config.yaml
 repos:
-  - repo: local
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.8.2
     hooks:
-      - id: jupyter-nb-clear-output
-        name: jupyter-nb-clear-output
+      - id: nbstripout
         files: \.ipynb$
-        stages: [pre-commit]
-        language: system
-        entry: jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace
 
