@@ -25,5 +25,13 @@ S.set_pos(Cr, lr*R.x)
 P.set_pos(S, -lf1 * F.z)
 Cf.set_pos(P, lf2 * F.x)
 
-
 Cf.pos_from(Cr)
+
+r_Cf_Cr_xz_x = Cf.pos_from(Cr).dot(N.x)
+r_Cf_Cr_xz_z = Cf.pos_from(Cr).dot(N.z)
+
+r_Cr_O_xz_x = Cr.pos_from(O).dot(N.x)
+r_Cr_O_xz_z = Cr.pos_from(O).dot(N.z)
+
+r_P_S_x = R.x.dot(N.x)
+r_P_S_z = R.z.dot(N.z)

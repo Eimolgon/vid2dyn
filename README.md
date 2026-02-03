@@ -17,23 +17,17 @@ Example for filtered data with csv output:
 `python ellipse2data.py /path/to/folder --output filename.csv --cutoff 1.5 --fs 30`
 
 
-YOLO training
---------------
-
-1. Create the virtual environment from `train/ultralytics-env.yml`
-
-
-TO - DO
+To-Do
 -------
 
 - [x] Plot x distance
 - [x] Plot y distance
 - [x] Plot absolute distance
 - [ ] Find ellipse extremes ([xd, yd], [xu, yu], [xl, yl], [xr, yr])
-- [ ] Compare angle from points and from reconstruction
 - [ ] Test reconstruction accuracy
-- [ ] More points == more accuracy?
-- [ ] Check dependencies
+- [x] More points == more accuracy?
+- [x] Check dependencies
+- [ ] Argparse
 
 
 Directory structure
@@ -164,3 +158,8 @@ Dataset - camera motion
 
 Notes
 -----
+
+-  argparse options: single frame, all frames, plot, animate.
+    - Default: all frames, no animation, no plot, print results.
+
+- how to test reconstruction accuracy?

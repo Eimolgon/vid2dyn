@@ -3,6 +3,7 @@ import json
 import math
 import random
 import datetime
+import argparse
 import numpy as np
 import sympy as sp
 import sympy.physics.mechanics as me
@@ -283,6 +284,28 @@ def animate3d(data, resolution, first_frame, save=False):
     return
 
 
+def clean4json(obj):
+    # numpy arrays -> lists
+    if isinstance(obj, np.ndarray):
+        return [clean4json(x) for x in obj.tolist()]
+    # numpy scalars -> python scalars
+    if isinstance(obj, (np.floating, np.integer, np.bool_)):
+        return obj.item()
+    # handle floats: replace NaN/Inf with None (strict JSON)
+    if isinstance(obj, float):
+        if not math.isfinite(obj):
+            # return None
+            return 0
+        return obj
+    # containers
+    if isinstance(obj, dict):
+        return {k: clean4json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [clean4json(x) for x in obj]
+    # pass through other JSON-safe types (str, int, bool, None)
+    return obj
+
+
 def data4model(track_data, assumed_origin):
     '''
     Create the nested dictionary by frame for the data required in the model of the bicycle
@@ -313,41 +336,41 @@ def data4model(track_data, assumed_origin):
 
     x_f = np.array(ellipse_f[:,0])
     z_f = np.array(ellipse_f[:,1])
+    a_f = ellipse_f[:,2]
+    b_f = ellipse_f[:,3]
     theta_f = ellipse_f[:,4]
-    q1_f = ellipse_f[:,5]
-    q2_f = ellipse_f[:,6]
 
 
-    ellipse_f_data = [x_f, z_f, theta_f, q1_f, q2_f]
+    ellipse_f_data = [x_f, z_f, a_f, b_f, theta_f]
 
 
     x_r = np.array(ellipse_r[:,0])
     z_r = np.array(ellipse_r[:,1])
+    a_r = ellipse_r[:,2]
+    b_r = ellipse_r[:,3]
     theta_r = ellipse_r[:,4]
-    q1_r = ellipse_r[:,5]
-    q2_r = ellipse_r[:,6]
 
-    ellipse_r_data = [x_r, z_r, theta_r, q1_r, q2_r]
+    ellipse_r_data = [x_r, z_r, a_r, b_r, theta_r]
     
 
     ellipses_data = [ellipse_r_data, ellipse_f_data]
 
     rear_wheel['x'] = x_r
     rear_wheel['z'] = z_r
-    rear_wheel['psi'] = angle_cam_r
+    rear_wheel['psi'] = q1_r
 
-    data['Ry_x'] = np.sin(angle_cam_r)*np.cos(theta_r)
-    data['Ry_z'] = np.sin(angle_cam_r)*np.sin(theta_r)
+    data['Ry_x'] = np.sin(q1_r)*np.cos(theta_r)
+    data['Ry_z'] = np.sin(q1_r)*np.sin(theta_r)
 
-    data['Fy_x'] = np.sin(angle_cam_f)*np.cos(theta_f)
-    data['Fy_z'] = np.sin(angle_cam_f)*np.sin(theta_f)
+    data['Fy_x'] = np.sin(q1_f)*np.cos(theta_f)
+    data['Fy_z'] = np.sin(q1_f)*np.sin(theta_f)
 
     data['r_Cf_Cr_x'] = x_f - x_r
     data['r_Cf_Cr_z'] = z_f - z_r
     data['r_Cr_O_x'] = x_r - assumed_origin[0]
     data['r_Cr_O_z'] = z_r - assumed_origin[1]
-    data['r_P_S_x'] = (np.sin(angle_cam_f)*np.cos(angle_cam_r) - np.sin(angle_cam_r)*np.cos(angle_cam_f)*np.cos(theta_f - theta_r))*np.sin(theta_f)/np.sqrt((np.sin(angle_cam_f)*np.cos(angle_cam_r) - np.sin(angle_cam_r)*np.cos(angle_cam_f)*np.cos(theta_f - theta_r))**2 + np.sin(angle_cam_r)**2*np.sin(theta_f - theta_r)**2) + np.sin(angle_cam_r)*np.sin(theta_f - theta_r)*np.cos(angle_cam_f)*np.cos(theta_f)/np.sqrt((np.sin(angle_cam_f)*np.cos(angle_cam_r) - np.sin(angle_cam_r)*np.cos(angle_cam_f)*np.cos(theta_f - theta_r))**2 + np.sin(angle_cam_r)**2*np.sin(theta_f - theta_r)**2)
-    data['r_P_S_z'] = (np.sin(angle_cam_f)*np.cos(angle_cam_r) - np.sin(angle_cam_r)*np.cos(angle_cam_f)*np.cos(theta_f - theta_r))*np.cos(theta_f)/np.sqrt((np.sin(angle_cam_f)*np.cos(angle_cam_r) - np.sin(angle_cam_r)*np.cos(angle_cam_f)*np.cos(theta_f - theta_r))**2 + np.sin(angle_cam_r)**2*np.sin(theta_f - theta_r)**2) - np.sin(angle_cam_r)*np.sin(theta_f)*np.sin(theta_f - theta_r)*np.cos(angle_cam_f)/np.sqrt((np.sin(angle_cam_f)*np.cos(angle_cam_r) - np.sin(angle_cam_r)*np.cos(angle_cam_f)*np.cos(theta_f - theta_r))**2 + np.sin(angle_cam_r)**2*np.sin(theta_f - theta_r)**2)
+    data['r_P_S_x'] = (np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))*np.sin(theta_f)/np.sqrt((np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))**2 + np.sin(q1_r)**2*np.sin(theta_f - theta_r)**2) + np.sin(q1_r)*np.sin(theta_f - theta_r)*np.cos(q1_f)*np.cos(theta_f)/np.sqrt((np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))**2 + np.sin(q1_r)**2*np.sin(theta_f - theta_r)**2)
+    data['r_P_S_z'] = (np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))*np.cos(theta_f)/np.sqrt((np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))**2 + np.sin(q1_r)**2*np.sin(theta_f - theta_r)**2) - np.sin(q1_r)*np.sin(theta_f)*np.sin(theta_f - theta_r)*np.cos(q1_f)/np.sqrt((np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))**2 + np.sin(q1_r)**2*np.sin(theta_f - theta_r)**2)
 
     data_json = clean4json(data)
     rw_json = clean4json(rear_wheel)
@@ -379,3 +402,10 @@ imgdata = {
     'r_P_S_x': (np.sin(cam_angle_f)*np.cos(cam_angle_r) - np.sin(cam_angle_r)*np.cos(cam_angle_f)*np.cos(theta_f - theta_r))*np.sin(theta_f)/np.sqrt((np.sin(cam_angle_f)*np.cos(cam_angle_r) - np.sin(cam_angle_r)*np.cos(cam_angle_f)*np.cos(theta_f - theta_r))**2 + np.sin(cam_angle_r)**2*np.sin(theta_f - theta_r)**2) + np.sin(cam_angle_r)*np.sin(theta_f - theta_r)*np.cos(cam_angle_f)*np.cos(theta_f)/np.sqrt((np.sin(cam_angle_f)*np.cos(cam_angle_r) - np.sin(cam_angle_r)*np.cos(cam_angle_f)*np.cos(theta_f - theta_r))**2 + np.sin(cam_angle_r)**2*np.sin(theta_f - theta_r)**2),
     'r_P_S_z': (np.sin(cam_angle_f)*np.cos(cam_angle_r) - np.sin(cam_angle_r)*np.cos(cam_angle_f)*np.cos(theta_f - theta_r))*np.cos(theta_f)/np.sqrt((np.sin(cam_angle_f)*np.cos(cam_angle_r) - np.sin(cam_angle_r)*np.cos(cam_angle_f)*np.cos(theta_f - theta_r))**2 + np.sin(cam_angle_r)**2*np.sin(theta_f - theta_r)**2) - np.sin(cam_angle_r)*np.sin(theta_f)*np.sin(theta_f - theta_r)*np.cos(cam_angle_f)/np.sqrt((np.sin(cam_angle_f)*np.cos(cam_angle_r) - np.sin(cam_angle_r)*np.cos(cam_angle_f)*np.cos(theta_f - theta_r))**2 + np.sin(cam_angle_r)**2*np.sin(theta_f - theta_r)**2)
 }
+
+parser = argparse.ArgumentParser()
+parser.add_argument('word')
+args = parser.parse_args()
+
+sentence = 'El gato es' + args.word
+
