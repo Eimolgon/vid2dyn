@@ -23,7 +23,7 @@ To-Do
 - [x] Plot x distance
 - [x] Plot y distance
 - [x] Plot absolute distance
-- [ ] Find ellipse extremes ([xd, yd], [xu, yu], [xl, yl], [xr, yr])
+- [x] Find ellipse extremes ([xd, yd], [xu, yu], [xl, yl], [xr, yr])
 - [ ] Test reconstruction accuracy
 - [x] More points == more accuracy?
 - [x] Check dependencies

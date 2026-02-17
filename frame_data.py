@@ -14,6 +14,7 @@ from matplotlib import collections as mc
 from skimage.measure import EllipseModel
 from collections import defaultdict
 from scipy.signal import butter, filtfilt
+from bike_model import *
 
 
 def readEllipse(file_path):
@@ -38,11 +39,13 @@ def readEllipse(file_path):
         })
 
     return ellipses
-
+    
 
 def fitEllipse(points, screen_res):
     '''
     Recreates the ellipse to output parameters and angle to the camera plane
+    a: vertical axis
+    b: horizontal axis
     '''
 
     ell = EllipseModel()
@@ -137,6 +140,33 @@ def apply_filters(tracking_data, cutoff=2.0, fs=30.0):
             filtered_data[class_id] = filtered
 
     return filtered_data
+
+
+def find_points(ellipse:list):
+    '''
+    Find extreme points of the ellipse.
+    
+    input: ellipse
+        x, z = center
+        a = major axis (horizontal)
+        b = minor axis (vertical)
+        theta = angle
+    output: p1, p2, p3, and p4
+    '''
+
+    x = ellipse[0]
+    z = ellipse[1]
+    a = ellipse[2]
+    b = ellipse[3]
+    theta = ellipse[4]
+    
+    p1 = (x - b*np.sin(theta), z + b*np.cos(theta))
+    p2 = (x - a*np.cos(theta), z - a*np.sin(theta))
+    p3 = (x + b*np.sin(theta), z - b*np.cos(theta))
+    p4 = (x + a*np.cos(theta), z + a*np.sin(theta))
+    
+
+    return (p1, p2, p3, p4)
 
 
 def animate2d(data, resolution, first_frame):
@@ -312,16 +342,20 @@ def data4model(track_data, assumed_origin):
     '''
 
     data = {
-        'Ry_x':0,
-        'Ry_z':0,
-        'Fy_x':0,
-        'Fy_z':0,
         'r_Cf_Cr_x':0,
         'r_Cf_Cr_z':0,
         'r_Cr_O_x':0,
         'r_Cr_O_z':0,
-        'r_P_S_x':0,
-        'r_P_S_z':0
+        'r_Q_S_x':0,
+        'r_Q_S_z':0,
+        'r_P1r_Cr_x':0,
+        'r_P1r_Cr_z':0,
+        'r_P2r_Cr_x':0,
+        'r_P2r_Cr_z':0,
+        'r_P1f_Cf_x':0,
+        'r_P1f_Cf_z':0,
+        'r_P2f_Cf_x':0,
+        'r_P2f_Cf_z':0,
     }
 
     rear_wheel = {
@@ -340,9 +374,8 @@ def data4model(track_data, assumed_origin):
     b_f = ellipse_f[:,3]
     theta_f = ellipse_f[:,4]
 
-
     ellipse_f_data = [x_f, z_f, a_f, b_f, theta_f]
-
+    extremes_f = find_points(ellipse_f_data)
 
     x_r = np.array(ellipse_r[:,0])
     z_r = np.array(ellipse_r[:,1])
@@ -351,26 +384,27 @@ def data4model(track_data, assumed_origin):
     theta_r = ellipse_r[:,4]
 
     ellipse_r_data = [x_r, z_r, a_r, b_r, theta_r]
-    
+    extremes_r = find_points(ellipse_r_data)
 
-    ellipses_data = [ellipse_r_data, ellipse_f_data]
+    # ellipses_data = [ellipse_r_data, ellipse_f_data]
 
     rear_wheel['x'] = x_r
     rear_wheel['z'] = z_r
-    rear_wheel['psi'] = q1_r
-
-    data['Ry_x'] = np.sin(q1_r)*np.cos(theta_r)
-    data['Ry_z'] = np.sin(q1_r)*np.sin(theta_r)
-
-    data['Fy_x'] = np.sin(q1_f)*np.cos(theta_f)
-    data['Fy_z'] = np.sin(q1_f)*np.sin(theta_f)
 
     data['r_Cf_Cr_x'] = x_f - x_r
     data['r_Cf_Cr_z'] = z_f - z_r
     data['r_Cr_O_x'] = x_r - assumed_origin[0]
     data['r_Cr_O_z'] = z_r - assumed_origin[1]
-    data['r_P_S_x'] = (np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))*np.sin(theta_f)/np.sqrt((np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))**2 + np.sin(q1_r)**2*np.sin(theta_f - theta_r)**2) + np.sin(q1_r)*np.sin(theta_f - theta_r)*np.cos(q1_f)*np.cos(theta_f)/np.sqrt((np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))**2 + np.sin(q1_r)**2*np.sin(theta_f - theta_r)**2)
-    data['r_P_S_z'] = (np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))*np.cos(theta_f)/np.sqrt((np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))**2 + np.sin(q1_r)**2*np.sin(theta_f - theta_r)**2) - np.sin(q1_r)*np.sin(theta_f)*np.sin(theta_f - theta_r)*np.cos(q1_f)/np.sqrt((np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))**2 + np.sin(q1_r)**2*np.sin(theta_f - theta_r)**2)
+    # data['r_P_S_x'] = (np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))*np.sin(theta_f)/np.sqrt((np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))**2 + np.sin(q1_r)**2*np.sin(theta_f - theta_r)**2) + np.sin(q1_r)*np.sin(theta_f - theta_r)*np.cos(q1_f)*np.cos(theta_f)/np.sqrt((np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))**2 + np.sin(q1_r)**2*np.sin(theta_f - theta_r)**2)
+    # data['r_P_S_z'] = (np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))*np.cos(theta_f)/np.sqrt((np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))**2 + np.sin(q1_r)**2*np.sin(theta_f - theta_r)**2) - np.sin(q1_r)*np.sin(theta_f)*np.sin(theta_f - theta_r)*np.cos(q1_f)/np.sqrt((np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))**2 + np.sin(q1_r)**2*np.sin(theta_f - theta_r)**2)
+    data['r_P1f_Cf_x'] = extremes_f[0][0]
+    data['r_P1f_Cf_z'] = extremes_f[0][1]
+    data['r_P3f_Cf_x'] = extremes_f[2][0]
+    data['r_P3f_Cf_z'] = extremes_f[2][1]
+    data['r_P1r_Cr_x'] = extremes_r[0][0]
+    data['r_P1r_Cr_z'] = extremes_r[0][1]
+    data['r_P3r_Cr_x'] = extremes_r[2][0]
+    data['r_P3r_Cr_z'] = extremes_r[2][1]
 
     data_json = clean4json(data)
     rw_json = clean4json(rear_wheel)
@@ -391,10 +425,6 @@ date =  rawdate.strftime('%Y') + rawdate.strftime('%m') + rawdate.strftime('%d')
 
 
 imgdata = {
-    'Ry_x': np.sin(cam_angle_r)*np.cos(theta_r),
-    'Ry_z': np.sin(cam_angle_r)*np.sin(theta_r),
-    'Fy_x': np.sin(cam_angle_f)*np.cos(theta_f),
-    'Fy_z': np.sin(cam_angle_f)*np.sin(theta_f),
     'r_Cf_Cr_x': x_f-x_r,
     'r_Cf_Cr_z': y_f-y_r,
     'r_Cr_O_x': x_r - assumed_origin[0],
@@ -404,8 +434,16 @@ imgdata = {
 }
 
 parser = argparse.ArgumentParser()
-parser.add_argument('word')
+parser.add_argument('-f','--filter', default=False, action='store_true', 
+                    help='Apply low pass filter')
+parser.add_argument('-a2d', '--animate-2d', default=False, action='store_true', 
+                    help='Plot 2D animation')
+parser.add_argument('-a3d', '--animate-3d', default=False, action='store_true', 
+                    help='Plot 3D animation')
 args = parser.parse_args()
 
-sentence = 'El gato es' + args.word
 
+
+parser.add_argument('--word', type=str, required=False)
+parser.add_argument('-l', '--long', action='store_true', help='sets long something')
+parser.add_argument('-s', '--show', action='store_true', help='shows plots')
