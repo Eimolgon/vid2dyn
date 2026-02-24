@@ -1,5 +1,26 @@
 import sympy as sp
+import numpy as np
 import sympy.physics.mechanics as me
+
+def residual_eqs(x, data, bike_params):
+    subs = (x[0], x[1], x[2], x[3], x[4], x[5], x[6], bike_params['lr'],
+            bike_params['lf1'], bike_params['lf2'], bike_params['r'])
+
+    f01 = eval_f01(*subs) - data['r_Cf_Cr_x']
+    f02 = eval_f02(*subs) - data['r_Cf_Cr_z']
+    f03 = eval_f03(*subs) - data['r_Cr_O_x']
+    f04 = eval_f04(*subs) - data['r_Cr_O_z']
+    f05 = eval_f05(*subs) - data['r_P1r_Cr_x']
+    f06 = eval_f06(*subs) - data['r_P1r_Cr_z']
+    f07 = eval_f07(*subs) - data['r_P3r_Cr_x']
+    f08 = eval_f08(*subs) - data['r_P3r_Cr_z']
+    f09 = eval_f09(*subs) - data['r_P1f_Cf_x']
+    f10 = eval_f10(*subs) - data['r_P1f_Cf_z']
+    f11 = eval_f11(*subs) - data['r_P3f_Cf_x']
+    f12 = eval_f12(*subs) - data['r_P3f_Cf_z']
+
+    return np.array([f01, f02, f03, f04, f05, f06, f07, f08, f09, f10, f11, f12])
+
 
 phi, theta, psi, delta = sp.symbols('varphi, theta, psi, delta')
 lr, lf1, lf2 = sp.symbols('l_r, l_f1, l_f2')
@@ -72,15 +93,15 @@ r_P3f_Cf_z = P3f.pos_from(Cf).dot(N.z)
 
 # Lambdify functions
 
-eval_f1 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cf_Cr_xz_x)
-eval_f2 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cf_Cr_xz_z)
-eval_f3 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cr_O_xz_x)
-eval_f4 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cr_O_xz_z)
-eval_f5 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P1r_Cr_x)
-eval_f6 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P1r_Cr_z)
-eval_f7 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P3r_Cr_x)
-eval_f8 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P3r_Cr_z)
-eval_f9 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P1f_Cf_x)
+eval_f01 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cf_Cr_xz_x)
+eval_f02 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cf_Cr_xz_z)
+eval_f03 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cr_O_xz_x)
+eval_f04 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cr_O_xz_z)
+eval_f05 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P1r_Cr_x)
+eval_f06 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P1r_Cr_z)
+eval_f07 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P3r_Cr_x)
+eval_f08 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P3r_Cr_z)
+eval_f09 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P1f_Cf_x)
 eval_f10 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P1f_Cf_z)
 eval_f11 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P3f_Cf_x)
 eval_f12 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P3f_Cf_z)
