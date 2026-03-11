@@ -33,7 +33,11 @@ from utils import (
 )
 
 
-# ----- Tests -----
+# ----- Paths -----
+
+DATA_CUT = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/'
+DATA_1_1 = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_resize_annotation_161025/labels/Train/'
+DATA_CRASH_005 = '/home/eimolgon/Documents/PhD-Project/02-video-data/yt-crash-005/labels/train/'
 
 
 # ----- Parser setup -----
@@ -47,7 +51,7 @@ parser.add_argument('-f', '--filter',
                     help='Apply low pass filter')
 parser.add_argument('-d', '--data', 
                     type=str, default='0',
-                    help='Route to the data directory')
+                    help='Choose data directory')
 parser.add_argument('-sf', '--single_frame', 
                     default='0', type=str,
                     help='Extract data from a single frame, requires route to ' \
@@ -125,9 +129,10 @@ img_data = {
 
 if args.single_frame != '0':
 
-    # Test frame /home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000417.txt
+    test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000417.txt'
 
-    data_points = readFile(args.single_frame)
+    # data_points = readFile(args.single_frame)
+    data_points = readFile(test_frame_single)
     front_data = data_points[0]['points']
     rear_data = data_points[1]['points']
 
@@ -198,7 +203,15 @@ if args.single_frame != '0':
 elif args.data != '0':
 
     # ----- Data processing -----
-    raw_data = process_directory(args.data, screen_resolution)
+
+    if args.data == 'cut':
+        data_directory = DATA_CUT
+    elif args.data == '1-1':
+        data_directory = DATA_1_1
+    elif args.data == '05':
+        data_directory = DATA_CRASH_005
+
+    raw_data = process_directory(data_directory, screen_resolution)
     
     if args.filter:
         tracking_data = apply_filters(raw_data)

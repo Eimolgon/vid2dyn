@@ -152,7 +152,7 @@ def butter_lowpass(cutoff, fs, order=5):
     return b, a
 
 
-def lowpass_filter(data, cutoff=2.0, fs=30.0, order=5):
+def lowpass_filter(data, cutoff=1.5, fs=30.0, order=5):
     '''
     Apply lowpass filter to data.
     Input:
@@ -170,15 +170,14 @@ def apply_filters(tracking_data, cutoff=2.0, fs=30.0):
     Input: Unfiltered data.
     Output: Filtered data.
     '''
+
     
     filtered_data = {}
     for class_id, data in tracking_data.items():
         if class_id == 0 or class_id == 1:
             filtered = {
-                'x_pos': lowpass_filter(data['x_pos'], cutoff, fs),
-                'y_pos': lowpass_filter(data['y_pos'], cutoff, fs),
-                'major_axes': lowpass_filter(data['major_axes'], cutoff, fs),
-                'minor_axes': lowpass_filter(data['minor_axes'], cutoff, fs),
+                'x_pos': lowpass_filter(np.array(data['ellipses'])[:,0], cutoff, fs),
+                'y_pos': lowpass_filter(np.array(data['ellipses'])[:,1], cutoff, fs),
                 'frames': data['frames']
             }
             filtered_data[class_id] = filtered
