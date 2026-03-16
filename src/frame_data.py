@@ -1,35 +1,25 @@
-import os
 import json
-import math
 import time
-import random
 import datetime
 import argparse
 import numpy as np
-import sympy as sp
-import sympy.physics.mechanics as me
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 from matplotlib.patches import Ellipse
-from matplotlib import collections as mc
-from skimage.measure import EllipseModel
 from scipy.optimize import least_squares
-from scipy.signal import butter, filtfilt
-from collections import defaultdict
 from bike_model import *
+from skimage.draw import ellipse_perimeter
 
 from utils import (
     readFile,
     fitEllipse,
     find_points,
+    find_points2,
     process_directory,
-    butter_lowpass,
-    lowpass_filter,
     apply_filters,
     animate_Point,
     animate_Ellipse,
-    clean4json,
-    data4model
+    data4model,
+    fit_img2model
 )
 
 
@@ -57,17 +47,17 @@ parser.add_argument('-sf', '--single_frame',
                     help='Extract data from a single frame, requires route to ' \
                     'file')
 parser.add_argument('-p', '--plot',
-                    default=False, action='store_true',
+                    type=str, default='0',
                     help='Allow plotting of the results')
 parser.add_argument('--save', action='store_true',
                     help='Save plots')
 
 
 plot_group.add_argument('-a2d', '--animate_points', 
-                    default=False, action='store_true', 
+                    default='0', type=str, 
                     help='Plot points animation')
 plot_group.add_argument('-a3d', '--animate_ellipses', 
-                    default=False, action='store_true', 
+                    default='0', type=str, 
                     help='Plot ellipses animation')
 
 args = parser.parse_args()
@@ -94,8 +84,8 @@ bike_params = {
 
 lower_bound = [-np.pi/2, -np.pi/2, -np.pi/2, -np.pi/2, 0, -np.inf, 0]
 upper_bound = [np.pi/2, np.pi/2, np.pi/2, np.pi/2, 1920, np.inf, 1080]
+boundaries = (lower_bound, upper_bound)
 
-results_history = []
 
 # === Initial guess ===
 
@@ -109,27 +99,11 @@ x0 = np.array([
     400
 ])
 
-# === Data from image ===
-
-img_data = {
-    'r_Cf_Cr_x': 0, 
-    'r_Cf_Cr_z': 0, 
-    'r_Cr_O_x': 0, 
-    'r_Cr_O_z': 0,
-    'r_P1r_Cr_x': 0,
-    'r_P1r_Cr_z': 0,
-    'r_P3r_Cr_x': 0,
-    'r_P3r_Cr_z': 0,
-    'r_P1f_Cf_x': 0,
-    'r_P1f_Cf_z': 0,
-    'r_P3f_Cf_x': 0,
-    'r_P3f_Cf_z': 0
-}
-
 
 if args.single_frame != '0':
 
-    test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000417.txt'
+    # test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000417.txt'
+    test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000480.txt'
 
     # data_points = readFile(args.single_frame)
     data_points = readFile(test_frame_single)
@@ -139,12 +113,12 @@ if args.single_frame != '0':
     ellipse_front = fitEllipse(front_data, screen_resolution)
     ellipse_rear = fitEllipse(rear_data, screen_resolution)
 
+
     xf, zf, af, bf, theta_f = ellipse_front
     xr, zr, ar, br, theta_r = ellipse_rear
 
-    P1f, P2f, P3f, P4f, upper_f, bottom_f = find_points(ellipse_front)
-
-    P1r, P2r, P3r, P4r, upper_r, bottom_r = find_points(ellipse_rear)
+    upper_f, lower_f = find_points2(ellipse_front)
+    upper_r, lower_r = find_points2(ellipse_rear)
 
 
     imgdata = {
@@ -154,12 +128,12 @@ if args.single_frame != '0':
         'r_Cr_O_z' : zr - assumed_origin[1],
         'r_P1r_Cr_x' : upper_r[0] - xr,
         'r_P1r_Cr_z' : upper_r[1] - zr,
-        'r_P3r_Cr_x' : bottom_r[0] - xr,
-        'r_P3r_Cr_z' : bottom_r[1] - zr,
+        'r_P3r_Cr_x' : lower_r[0] - xr,
+        'r_P3r_Cr_z' : lower_r[1] - zr,
         'r_P1f_Cf_x' : upper_f[0] - xf,
         'r_P1f_Cf_z' : upper_f[1] - zf,
-        'r_P3f_Cf_x' : bottom_f[0] - xf,
-        'r_P3f_Cf_z' : bottom_f[1] - zf
+        'r_P3f_Cf_x' : lower_f[0] - xf,
+        'r_P3f_Cf_z' : lower_f[1] - zf
     }
 
     bike_params['r'] = 2*br
@@ -168,22 +142,19 @@ if args.single_frame != '0':
     print(f'Front wheel centre: ({ellipse_front[0]}, {ellipse_front[1]})')
     # print(f'Front wheel points: {P1f}, {P2f}, {P3f}, {P4f}')
     # print(f'Upper point front wheel: {upper_f}')
-    # print(f'Bottom point front wheel: {bottom_f}')
+    # print(f'lower point front wheel: {lower_f}')
     print(f'Rear wheel centre: ({ellipse_rear[0]}, {ellipse_rear[1]})')
 
-    if args.plot:
+    if args.plot != '0':
 
         plt.plot(xf, zf, 'xk')
-        plt.plot(P1f[0], P1f[1], 'ok')
-        plt.plot(P2f[0], P2f[1], 'ob')
-        plt.plot(P3f[0], P3f[1], 'or')
-        plt.plot(P4f[0], P4f[1], 'og')
+        plt.plot(upper_f[0], upper_f[1], 'ok')
+        plt.plot(lower_f[0], lower_f[1], 'ob')
+        plt.scatter(front_data[:, 0]*screen_resolution[0], (1 - front_data[:, 1])*screen_resolution[1], facecolors='none', edgecolors='red')
 
         plt.plot(xr, zr, 'xk')
-        plt.plot(P1r[0], P1r[1], 'ok')
-        plt.plot(P2r[0], P2r[1], 'ob')
-        plt.plot(P3r[0], P3r[1], 'or')
-        plt.plot(P4r[0], P4r[1], 'og')
+        plt.plot(upper_r[0], upper_r[1], 'ok')
+        plt.plot(lower_r[0], lower_r[1], 'ob')
 
         ell_patch_f = Ellipse((xf, zf), width = 2*af, height = 2*bf,
                       angle = theta_f*180/np.pi, edgecolor='blue', facecolor='none')
@@ -223,28 +194,7 @@ elif args.data != '0':
     
     bike_params['r'] = 2*max(rear_wheel[:, 3])
 
-    for i in range(len(rear_wheel)):
-        img_data['r_Cf_Cr_x'] = data_model['r_Cf_Cr_x'][i]
-        img_data['r_Cf_Cr_z'] = data_model['r_Cf_Cr_z'][i]
-        img_data['r_Cr_O_x'] = data_model['r_Cr_O_x'][i]
-        img_data['r_Cr_O_z'] = data_model['r_Cr_O_z'][i]
-        img_data['r_P1r_Cr_x'] = data_model['r_P1r_Cr_x'][i]
-        img_data['r_P1r_Cr_z'] = data_model['r_P1r_Cr_z'][i]
-        img_data['r_P3r_Cr_x'] = data_model['r_P3r_Cr_x'][i]
-        img_data['r_P3r_Cr_z'] = data_model['r_P3r_Cr_z'][i]
-        img_data['r_P1f_Cf_x'] = data_model['r_P1f_Cf_x'][i]
-        img_data['r_P1f_Cf_z'] = data_model['r_P1f_Cf_z'][i]
-        img_data['r_P3f_Cf_x'] = data_model['r_P3f_Cf_x'][i]
-        img_data['r_P3f_Cf_z'] = data_model['r_P3f_Cf_z'][i]
-
-        results_iteration = least_squares(residual_eqs, x0, 
-                                          args = (img_data, bike_params), 
-                                          bounds = (lower_bound, upper_bound))
-        results_history.append(results_iteration)
-
-        # Update initial guess
-        x0 = results_iteration['x'].copy()
-
+    results_history = fit_img2model(data_model, x0, bike_params, boundaries)
 
     roll_history = []
     pitch_history = []
@@ -263,6 +213,13 @@ elif args.data != '0':
         y_history.append(i['x'][5])
         z_history.append(i['x'][6])
 
+    data_sim = {'phi':roll_history, 'theta':pitch_history, 'psi':yaw_history, 
+                'delta':steer_history, 'xr':x_history, 'yr':y_history, 
+                'zr':z_history}
+
+    front_wheel_fit_x = x_history + data_model['r_Cf_Cr_x']
+    front_wheel_fit_z = z_history + data_model['r_Cf_Cr_z']
+
     end_time = time.time()
     print(f'Execution time: {end_time - start_time}')
 
@@ -271,31 +228,33 @@ elif args.data != '0':
         json.dump(data_model, f)
 
     # ----- Plotting -----
-    if args.animate_points:
+    if args.animate_points == 'data':
         animate_Point(tracking_data, screen_resolution, first_frame, save=args.save)
-    elif args.animate_ellipses:
+    elif args.animate_points == 'model':
+        animate_Point(tracking_data, screen_resolution, first_frame, save=args.save)
+    elif args.animate_ellipses == 'data':
         animate_Ellipse(tracking_data, screen_resolution, first_frame, save=args.save)
     
-    if args.plot:
-        plt.plot(roll_history, label = 'solver data')
+    if args.plot == 'all':
+        plt.plot(np.rad2deg(roll_history), label = 'solver data')
         plt.title('Roll angle')
         plt.xlabel('Frame')
         plt.ylabel('Angle')
         plt.show()
 
-        plt.plot(pitch_history, label = 'solver data')
+        plt.plot(np.rad2deg(pitch_history), label = 'solver data')
         plt.title('Pitch angle')
         plt.xlabel('Frame')
         plt.ylabel('Angle')
         plt.show()
 
-        plt.plot(yaw_history, label = 'solver data')
+        plt.plot(np.rad2deg(yaw_history), label = 'solver data')
         plt.title('Yaw angle')
         plt.xlabel('Frame')
         plt.ylabel('Angle')
         plt.show()
 
-        plt.plot(steer_history, label = 'solver data')
+        plt.plot(np.rad2deg(steer_history), label = 'solver data')
         plt.title('Steer angle')
         plt.xlabel('Frame')
         plt.ylabel('Angle')
@@ -323,8 +282,8 @@ elif args.data != '0':
         plt.ylabel('Pixels')
         plt.show()
 
-        plt.plot(x_history, z_history, '-C', label = 'solver data')
-        plt.plot(rear_wheel[:,0], rear_wheel[:, 1], '--C', label = 'Video data')
+        plt.plot(x_history, z_history, c='C0', linestyle='dashed', label='solver data')
+        plt.plot(rear_wheel[:,0], rear_wheel[:, 1], c='C1', linestyle='solid', label='Video data')
         plt.legend()
         plt.title('x vs z position')
         plt.xlabel('x position')

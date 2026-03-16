@@ -27,7 +27,10 @@ To-Do
 - [ ] Test reconstruction accuracy
 - [x] More points == more accuracy?
 - [x] Check dependencies
-- [ ] Argparse
+- [x] Argparse
+    - [ ] Improve argparse plot: -p all, -p yaw, -p roll, etc.
+    - [ ] Add -t for tests -t model -t ellipse, etc.
+- [ ] Fix filtered data processing
 
 
 Directory structure

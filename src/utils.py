@@ -1,21 +1,20 @@
 import os
 import json
 import math
-import time
-import random
-import datetime
-import argparse
 import numpy as np
 import sympy as sp
-import sympy.physics.mechanics as me
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
+from collections import defaultdict
+from bike_model import residual_eqs
 from matplotlib.patches import Ellipse
+import matplotlib.animation as animation
 from matplotlib import collections as mc
 from skimage.measure import EllipseModel
 from scipy.optimize import least_squares
 from scipy.signal import butter, filtfilt
-from collections import defaultdict
+from skimage.draw import ellipse_perimeter
+
+
 
 def readFile(file_path):
     '''
@@ -62,12 +61,6 @@ def fitEllipse(points, screen_res:tuple):
 
     ellipse_data = (x, z, a, b, theta)
 
-    # Unit test -----
-    b_test = 10
-    a_test = 10
-    assert np.arccos(b_test/a_test) == 0, 'Arccos(1) != 0'
-    # ----- ----- -----
-
     return ellipse_data
 
 
@@ -83,30 +76,45 @@ def find_points(ellipse):
     a = ellipse[2]
     b = ellipse[3]
     theta = ellipse[4]
-    
-    p1 = (x - b*np.sin(theta), z + b*np.cos(theta))
-    p2 = (x - a*np.cos(theta), z - a*np.sin(theta))
-    p3 = (x + b*np.sin(theta), z - b*np.cos(theta))
-    p4 = (x + a*np.cos(theta), z + a*np.sin(theta))
 
-    point_list = [p1[1], p2[1], p3[1], p4[1]]
-    bottom_point_idx = point_list.index(min(point_list))
+    rr, cc = ellipse_perimeter(int(z), int(x), int(b), int(a), orientation=theta)
+    points = np.column_stack((cc, rr))
 
-    if bottom_point_idx == 0:
-        bottom_point = p1
-        upper_point = p3
-    elif bottom_point_idx == 1:
-        bottom_point = p2
-        upper_point = p4
-    elif bottom_point_idx == 2:
-        bottom_point = p3
-        upper_point = p1
-    else:
-        bottom_point = p4
-        upper_point = p2
+    z_col = points[:, 1]
+    idx_min = np.argmin(z_col)
+    idx_max = np.argmax(z_col)
 
+    upper_point = points[idx_max]
+    lower_point = points[idx_min]
 
-    return (p1, p2, p3, p4, upper_point, bottom_point)
+    return (upper_point, lower_point)
+
+def find_points2(ellipse):
+    '''
+    Find extreme points of the ellipse.
+    Input: ellipse parameters.
+    Output: p1, p2, p3, and p4.
+    '''
+
+    x = ellipse[0]
+    z = ellipse[1]
+    a = ellipse[2]
+    b = ellipse[3]
+    theta = ellipse[4]
+
+    d_z = np.sqrt(a**2*np.sin(theta)**2 + b**2*np.cos(theta)**2)
+
+    z_max = z + d_z
+    z_min = z - d_z
+
+    x_max = x + ((a**2 - b**2)*np.sin(theta)*np.cos(theta))/d_z
+    x_min = x - ((a**2 - b**2)*np.sin(theta)*np.cos(theta))/d_z
+
+    upper_point = (x_max, z_max)
+    lower_point = (x_min, z_min)
+
+    return (upper_point, lower_point)
+
 
 
 def process_directory(directory_path, screen_resolution):
@@ -176,8 +184,8 @@ def apply_filters(tracking_data, cutoff=2.0, fs=30.0):
     for class_id, data in tracking_data.items():
         if class_id == 0 or class_id == 1:
             filtered = {
-                'x_pos': lowpass_filter(np.array(data['ellipses'])[:,0], cutoff, fs),
-                'y_pos': lowpass_filter(np.array(data['ellipses'])[:,1], cutoff, fs),
+                'x': lowpass_filter(np.array(data['ellipses'])[:,0], cutoff, fs),
+                'z': lowpass_filter(np.array(data['ellipses'])[:,1], cutoff, fs),
                 'frames': data['frames']
             }
             filtered_data[class_id] = filtered
@@ -191,8 +199,6 @@ def animate_Point(data, resolution, first_frame, save=False):
     Input: Data of the points.
     Output: Plot the points in 2d.
     '''
-    
-    
 
     fig, ax = plt.subplots(figsize = (16,9))
     ax.axis('equal')
@@ -394,15 +400,15 @@ def data4model(track_data, assumed_origin):
     xf = np.array(ellipse_f[:,0])
     zf = np.array(ellipse_f[:,1])
     
-    upper_f = extremes_f[:, 4]
-    bottom_f = extremes_f[:, 5]
+    upper_f = extremes_f[:, 0]
+    bottom_f = extremes_f[:, 1]
 
 
     xr = np.array(ellipse_r[:,0])
     zr = np.array(ellipse_r[:,1])
     
-    upper_r = extremes_r[:, 4]
-    bottom_r = extremes_r[:, 5]
+    upper_r = extremes_r[:, 0]
+    bottom_r = extremes_r[:, 1]
 
 
     rear_wheel['x'] = xr
@@ -427,3 +433,55 @@ def data4model(track_data, assumed_origin):
     rw_json = clean4json(rear_wheel)
 
     return data_json, ellipse_r, ellipse_f
+
+
+def fit_img2model(real_data, initial_guess, bike_parameters, boundaries):
+    '''
+    Least_squares fitting from image data to multibody model.
+    Input: real_data, initial guess, bicycle parameters, and boundaries for the
+    solver.
+    Output: solver history.
+    '''
+    x0 = initial_guess
+    results_history = []
+
+    lower_bound, upper_bound = boundaries
+
+    image_data = {
+    'r_Cf_Cr_x': 0, 
+    'r_Cf_Cr_z': 0, 
+    'r_Cr_O_x': 0, 
+    'r_Cr_O_z': 0,
+    'r_P1r_Cr_x': 0,
+    'r_P1r_Cr_z': 0,
+    'r_P3r_Cr_x': 0,
+    'r_P3r_Cr_z': 0,
+    'r_P1f_Cf_x': 0,
+    'r_P1f_Cf_z': 0,
+    'r_P3f_Cf_x': 0,
+    'r_P3f_Cf_z': 0
+    }
+
+    for i in range(len(real_data['r_Cf_Cr_x'])):
+        image_data['r_Cf_Cr_x'] = real_data['r_Cf_Cr_x'][i]
+        image_data['r_Cf_Cr_z'] = real_data['r_Cf_Cr_z'][i]
+        image_data['r_Cr_O_x'] = real_data['r_Cr_O_x'][i]
+        image_data['r_Cr_O_z'] = real_data['r_Cr_O_z'][i]
+        image_data['r_P1r_Cr_x'] = real_data['r_P1r_Cr_x'][i]
+        image_data['r_P1r_Cr_z'] = real_data['r_P1r_Cr_z'][i]
+        image_data['r_P3r_Cr_x'] = real_data['r_P3r_Cr_x'][i]
+        image_data['r_P3r_Cr_z'] = real_data['r_P3r_Cr_z'][i]
+        image_data['r_P1f_Cf_x'] = real_data['r_P1f_Cf_x'][i]
+        image_data['r_P1f_Cf_z'] = real_data['r_P1f_Cf_z'][i]
+        image_data['r_P3f_Cf_x'] = real_data['r_P3f_Cf_x'][i]
+        image_data['r_P3f_Cf_z'] = real_data['r_P3f_Cf_z'][i]
+
+        results_iteration = least_squares(residual_eqs, x0, 
+                                            args = (image_data, bike_parameters), 
+                                            bounds = (lower_bound, upper_bound))
+        results_history.append(results_iteration)
+
+        # Update initial guess
+        x0 = results_iteration['x'].copy()
+
+    return results_history

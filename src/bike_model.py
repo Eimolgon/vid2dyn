@@ -30,7 +30,7 @@ r = sp.symbols('r')
 N, R, F = sp.symbols('N, R, F', cls=me.ReferenceFrame)
 
 
-R.orient_body_fixed(N, (psi, phi, theta), 'zxy')
+R.orient_body_fixed(N, (psi, phi, theta), 'ZXY')
 F.orient_axis(R, delta, R.z)
 
 Cr = me.Point('C_r')
@@ -54,9 +54,10 @@ O.set_pos(O, 0)
 O.set_vel(N, 0)
 
 Cr.set_pos(O, x_r*N.x + y_r*N.y + z_r*N.z) # assuming that the bicycle is never in front of the set origin.
-S.set_pos(Cr, lr*R.x)
-Q.set_pos(S, -lf1 * F.z)
+S.set_pos(Cr, lr * R.x)
+Q.set_pos(S, lf1 * -F.z)
 Cf.set_pos(Q, lf2 * F.x)
+
 
 P1r.set_pos(Cr, r*me.cross(R.y, -me.cross(R.y, N.z)))
 P2r.set_pos(Cr, r*me.cross(R.y, me.cross(R.y, N.x)))
@@ -70,11 +71,11 @@ P4f.set_pos(Cf, r*me.cross(F.y, me.cross(F.y, -N.x)))
 
 # Projections into the screen plane
 
-r_Cf_Cr_xz_x = Cf.pos_from(Cr).dot(N.x)
-r_Cf_Cr_xz_z = Cf.pos_from(Cr).dot(N.z)
+r_Cf_Cr_x = Cf.pos_from(Cr).dot(N.x)
+r_Cf_Cr_z = Cf.pos_from(Cr).dot(N.z)
 
-r_Cr_O_xz_x = Cr.pos_from(O).dot(N.x)
-r_Cr_O_xz_z = Cr.pos_from(O).dot(N.z)
+r_Cr_O_x = Cr.pos_from(O).dot(N.x)
+r_Cr_O_z = Cr.pos_from(O).dot(N.z)
 
 r_Q_S_x = R.x.dot(N.x)
 r_Q_S_z = R.z.dot(N.z)
@@ -93,10 +94,10 @@ r_P3f_Cf_z = P3f.pos_from(Cf).dot(N.z)
 
 # Lambdify functions
 
-eval_f01 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cf_Cr_xz_x)
-eval_f02 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cf_Cr_xz_z)
-eval_f03 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cr_O_xz_x)
-eval_f04 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cr_O_xz_z)
+eval_f01 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cf_Cr_x)
+eval_f02 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cf_Cr_z)
+eval_f03 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cr_O_x)
+eval_f04 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cr_O_z)
 eval_f05 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P1r_Cr_x)
 eval_f06 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P1r_Cr_z)
 eval_f07 = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P3r_Cr_x)
