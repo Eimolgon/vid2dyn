@@ -31,6 +31,9 @@ To-Do
     - [ ] Improve argparse plot: -p all, -p yaw, -p roll, etc.
     - [ ] Add -t for tests -t model -t ellipse, etc.
 - [ ] Fix filtered data processing
+- [ ] Check ellipse animation https://stackoverflow.com/questions/78113285/time-control-bar-for-animation-in-matplotlib
+- [ ] Check ellipse reconstruction
+
 
 
 Directory structure

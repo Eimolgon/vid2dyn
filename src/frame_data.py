@@ -13,7 +13,6 @@ from utils import (
     readFile,
     fitEllipse,
     find_points,
-    find_points2,
     process_directory,
     apply_filters,
     animate_Point,
@@ -49,7 +48,7 @@ parser.add_argument('-sf', '--single_frame',
 parser.add_argument('-p', '--plot',
                     type=str, default='0',
                     help='Allow plotting of the results')
-parser.add_argument('--save', action='store_true',
+parser.add_argument('--save', default='none', type=str,
                     help='Save plots')
 
 
@@ -103,7 +102,8 @@ x0 = np.array([
 if args.single_frame != '0':
 
     # test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000417.txt'
-    test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000480.txt'
+    test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000483.txt'
+    # test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000480.txt'
 
     # data_points = readFile(args.single_frame)
     data_points = readFile(test_frame_single)
@@ -113,54 +113,62 @@ if args.single_frame != '0':
     ellipse_front = fitEllipse(front_data, screen_resolution)
     ellipse_rear = fitEllipse(rear_data, screen_resolution)
 
-
     xf, zf, af, bf, theta_f = ellipse_front
     xr, zr, ar, br, theta_r = ellipse_rear
 
-    upper_f, lower_f = find_points2(ellipse_front)
-    upper_r, lower_r = find_points2(ellipse_rear)
+    p1_f, p2_f, p3_f, p4_f, p2_f_2, p4_f_2 = find_points(ellipse_front)
+    p1_r, p2_r, p3_r, p4_r, p2_r_2, p4_r_2 = find_points(ellipse_rear)
 
 
     imgdata = {
-        'r_Cf_Cr_x' : xf - xr,
-        'r_Cf_Cr_z' : zf - zr,
-        'r_Cr_O_x' : xr - assumed_origin[0],
-        'r_Cr_O_z' : zr - assumed_origin[1],
-        'r_P1r_Cr_x' : upper_r[0] - xr,
-        'r_P1r_Cr_z' : upper_r[1] - zr,
-        'r_P3r_Cr_x' : lower_r[0] - xr,
-        'r_P3r_Cr_z' : lower_r[1] - zr,
-        'r_P1f_Cf_x' : upper_f[0] - xf,
-        'r_P1f_Cf_z' : upper_f[1] - zf,
-        'r_P3f_Cf_x' : lower_f[0] - xf,
-        'r_P3f_Cf_z' : lower_f[1] - zf
+        'r_Cf_Cr_x' : [xf - xr],
+        'r_Cf_Cr_z' : [zf - zr],
+        'r_Cr_O_x' : [xr - assumed_origin[0]],
+        'r_Cr_O_z' : [zr - assumed_origin[1]],
+        'r_P1r_Cr_x' : [p1_r[0] - xr],
+        'r_P1r_Cr_z' : [p1_r[1] - zr],
+        'r_P3r_Cr_x' : [p3_r[0] - xr],
+        'r_P3r_Cr_z' : [p3_r[1] - zr],
+        'r_P1f_Cf_x' : [p1_f[0] - xf],
+        'r_P1f_Cf_z' : [p1_f[1] - zf],
+        'r_P3f_Cf_x' : [p3_f[0] - xf],
+        'r_P3f_Cf_z' : [p3_f[1] - zf]
     }
 
     bike_params['r'] = 2*br
+    print(f'Max wheel radius = {bike_params['r']}')
 
-
-    print(f'Front wheel centre: ({ellipse_front[0]}, {ellipse_front[1]})')
-    # print(f'Front wheel points: {P1f}, {P2f}, {P3f}, {P4f}')
-    # print(f'Upper point front wheel: {upper_f}')
-    # print(f'lower point front wheel: {lower_f}')
-    print(f'Rear wheel centre: ({ellipse_rear[0]}, {ellipse_rear[1]})')
+    results = fit_img2model(imgdata, x0, bike_params, boundaries)
 
     if args.plot != '0':
+        
+        plt.plot(xf, zf, 'ok')
+        plt.scatter(p1_f[0], p1_f[1], marker='x', color='red')
+        # plt.scatter(p2_f[0], p2_f[1], marker='s', color='blue')
+        plt.scatter(p3_f[0], p3_f[1], marker='x', color='black')
+        # plt.scatter(p4_f[0], p4_f[1], marker='^', color='green')
+        # plt.scatter(front_data[:, 0]*screen_resolution[0], (1 - front_data[:, 1])*screen_resolution[1], facecolors='none', edgecolors='red')
+        # plt.scatter(p2_f_2[0], p2_f_2[1], marker='s', color='blue', facecolor='none')
+        # plt.scatter(p4_f_2[0], p4_f_2[1], marker='^', color='green', facecolor='none')
 
-        plt.plot(xf, zf, 'xk')
-        plt.plot(upper_f[0], upper_f[1], 'ok')
-        plt.plot(lower_f[0], lower_f[1], 'ob')
-        plt.scatter(front_data[:, 0]*screen_resolution[0], (1 - front_data[:, 1])*screen_resolution[1], facecolors='none', edgecolors='red')
+        plt.plot(xr, zr, 'ok')
+        plt.scatter(p1_r[0], p1_r[1], marker='x', color='red')
+        # plt.scatter(p2_r[0], p2_r[1], marker='s', color='blue')
+        plt.scatter(p3_r[0], p3_r[1], marker='x', color='black')
+        # plt.scatter(p4_r[0], p4_r[1], marker='^', color='green')
+        # plt.scatter(rear_data[:, 0]*screen_resolution[0], (1 - rear_data[:, 1])*screen_resolution[1], facecolors='none', edgecolors='blue')
+        # plt.scatter(p2_r_2[0], p2_r_2[1], marker='s', color='blue', facecolor='none')
+        # plt.scatter(p4_r_2[0], p4_r_2[1], marker='^', color='green', facecolor='none')
 
-        plt.plot(xr, zr, 'xk')
-        plt.plot(upper_r[0], upper_r[1], 'ok')
-        plt.plot(lower_r[0], lower_r[1], 'ob')
 
         ell_patch_f = Ellipse((xf, zf), width = 2*af, height = 2*bf,
-                      angle = theta_f*180/np.pi, edgecolor='blue', facecolor='none')
+                      angle = theta_f*180/np.pi, edgecolor='blue', 
+                      facecolor='none', linestyle='solid')
 
         ell_patch_r = Ellipse((xr, zr), width = 2*ar, height = 2*br,
-                      angle = theta_r*180/np.pi, edgecolor='red', facecolor='none')
+                      angle = theta_r*180/np.pi, edgecolor='red', 
+                      facecolor='none', linestyle='solid')
+        
 
         plt.gca().add_patch(ell_patch_f)
         plt.gca().add_patch(ell_patch_r)
@@ -229,11 +237,11 @@ elif args.data != '0':
 
     # ----- Plotting -----
     if args.animate_points == 'data':
-        animate_Point(tracking_data, screen_resolution, first_frame, save=args.save)
+        animate_Point(tracking_data, screen_resolution, first_frame, name=args.save)
     elif args.animate_points == 'model':
-        animate_Point(tracking_data, screen_resolution, first_frame, save=args.save)
+        animate_Point(tracking_data, screen_resolution, first_frame, name=args.save)
     elif args.animate_ellipses == 'data':
-        animate_Ellipse(tracking_data, screen_resolution, first_frame, save=args.save)
+        animate_Ellipse(tracking_data, screen_resolution, first_frame, name=args.save)
     
     if args.plot == 'all':
         plt.plot(np.rad2deg(roll_history), label = 'solver data')

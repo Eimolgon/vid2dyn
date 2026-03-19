@@ -100,8 +100,31 @@ eval_front_p4_z = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, l
 
 # subs = (0, 0, 0, 0, 500, 0, 355.6, 1000, 500, 100, 355.6)
 # subs = (0, 0, 0, 0, 0, 0, 0, 1000, 500, 100, 500)
-subs = (np.deg2rad(-10), np.deg2rad(-21.8014125), np.deg2rad(10), 
-        np.deg2rad(25), 5, 0, 5, 4, 2, 1, 2)
+
+
+subs = (np.deg2rad(-10), 
+        np.deg2rad(-21.8014125), 
+        np.deg2rad(10), 
+        np.deg2rad(25), 
+        5, 
+        0, 
+        5, 
+        4, 
+        2, 
+        1, 
+        2)
+
+# subs = (0, 
+#         np.deg2rad(-21.8014125), 
+#         0, 
+#         0, 
+#         5, 
+#         0, 
+#         5, 
+#         4, 
+#         2, 
+#         1, 
+#         2)
 
 
 

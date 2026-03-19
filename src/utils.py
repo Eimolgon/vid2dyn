@@ -42,7 +42,7 @@ def readFile(file_path):
     return ellipses
     
 
-def fitEllipse(points, screen_res:tuple):
+def fitEllipse_old(points, screen_res:tuple):
     '''
     Recreates the ellipse to output parameters and angle to the camera plane.
     Input: points, screen_resolution.
@@ -64,6 +64,138 @@ def fitEllipse(points, screen_res:tuple):
     return ellipse_data
 
 
+def fitEllipse_old2(points, screen_resolution:tuple):
+    x_i = points[:, 0]*screen_resolution[0]
+    y_i = (1 - points[:, 1])*screen_resolution[1]
+
+    x = x_i[:, np.newaxis]
+    y = y_i[:, np.newaxis]
+    
+    # Design matrix
+    D = np.hstack((x*x, x*y, y*y, x, y, np.ones_like(x)))
+    
+    # Scatter matrix
+    S = np.dot(D.T, D)
+    
+    # Constraint matrix
+    C = np.zeros((6, 6))
+    C[0, 2] = 2
+    C[1, 1] = -1
+    C[2, 0] = 2
+    
+    # Solve generalized eigenvalue problem: S * v = lambda * C * v
+    eigenvalues, eigenvectors = np.linalg.eig(np.linalg.inv(S).dot(C))
+    
+    # The eigenvector corresponding to the only positive eigenvalue is our solution
+    pos_eval_idx = np.where(eigenvalues > 0)[0]
+    if len(pos_eval_idx) == 0:
+        return None  # Should not happen with valid data
+        
+    coeffs = eigenvectors[:, pos_eval_idx[0]]
+
+    a, b, c, d, e, f = coeffs
+
+    num = b**2 - 4*a*c
+    xc = (2*c*d - b*e) / num
+    yc = (2*a*e - b*d) / num
+
+    # 2. Calculate Semi-axes
+    # We use absolute values inside the sqrt to handle sign flips
+    # and floating point noise.
+    up = 2 * (a*e**2 + c*d**2 + f*b**2 - b*d*e - 4*a*c*f)
+    
+    # Term in the denominator
+    term = np.sqrt((a - c)**2 + b**2)
+    
+    # Use abs() to prevent RuntimeWarning from tiny negative numbers 
+    # caused by precision limits.
+    res_a = np.sqrt(np.abs(up / (num * (a + c - term))))
+    res_b = np.sqrt(np.abs(up / (num * (a + c + term))))
+
+    # 3. Calculate Rotation Angle
+    theta = 0.5 * np.arctan2(b, (a - c))
+
+
+    ellipse_coeffs = (xc, yc, res_b, res_a, theta)
+
+    return ellipse_coeffs
+
+
+def fitEllipse(points, resolution):
+    """
+    Fits an ellipse to normalized points and rescales it to screen resolution.
+    
+    Args:
+        points: (N, 2) array of normalized (x, y) coordinates.
+        resolution: (sx, sy) tuple representing the scale factors (e.g., screen width/height).
+        
+    Returns:
+        x, y: Center coordinates in scaled space.
+        a, b: Semi-major and semi-minor axes in scaled space.
+        theta: Rotation angle in radians (standardized range).
+    """
+    sx, sy = resolution
+    xn = points[:, 0]
+    yn = points[:, 1]
+
+    # 1. Fit in normalized space
+    D = np.stack([xn**2, xn*yn, yn**2, xn, yn, np.ones_like(xn)], axis=1)
+    S = D.T @ D
+    C = np.zeros((6, 6))
+    C[0, 2], C[2, 0], C[1, 1] = 2, 2, -1
+    
+    try:
+        evals, evecs = np.linalg.eig(np.linalg.inv(S) @ C)
+        coeffs = evecs[:, np.argmax(evals)]
+    except:
+        return None
+
+    # 2. Map to screen: x = sx*xn, y = sy*(1 - yn)
+    a_n, b_n, c_n, d_n, e_n, f_n = coeffs
+    
+    # Transformation algebra
+    a = a_n / (sx**2)
+    b = -b_n / (sx * sy) 
+    c = c_n / (sy**2)
+    d = (b_n + d_n) / sx
+    e = -(2 * c_n + e_n) / sy
+    f = c_n + e_n + f_n
+
+    # 3. Robust Extraction using the Matrix Form
+    # Center (standard solution for linear system of partial derivatives)
+    num = b**2 - 4*a*c
+    xc = (2*c*d - b*e) / num
+    yc = (2*a*e - b*d) / num
+
+    # Re-scale the constant term relative to the new center
+    # This value 'q' determines the size of the axes
+    q = a*xc**2 + b*xc*yc + c*yc**2 - f
+    
+    # Quadratic form matrix
+    A_mat = np.array([[a, b/2], [b/2, c]])
+    eigvals, eigvecs = np.linalg.eigh(A_mat)
+
+    # Semi-axes: sqrt(q / eigenvalue)
+    # We use abs to ensure no sqrt of negative due to float noise
+    axis_lengths = np.sqrt(np.abs(q / eigvals))
+    
+    # Identify which eigenvalue corresponds to which axis
+    # We force axis_1 to be the MAJOR axis
+    if axis_lengths[0] >= axis_lengths[1]:
+        axis_1, axis_2 = axis_lengths[0], axis_lengths[1]
+        # Angle of the first eigenvector
+        theta = np.arctan2(eigvecs[1, 0], eigvecs[0, 0])
+    else:
+        axis_1, axis_2 = axis_lengths[1], axis_lengths[0]
+        theta = np.arctan2(eigvecs[1, 1], eigvecs[0, 1])
+
+    # 4. Final Angle Normalization
+    # Ensure theta is in a consistent range
+    theta = (theta + np.pi/2) % np.pi - np.pi/2
+
+    return xc, yc, axis_1, axis_2, theta
+
+
 def find_points(ellipse):
     '''
     Find extreme points of the ellipse.
@@ -77,44 +209,44 @@ def find_points(ellipse):
     b = ellipse[3]
     theta = ellipse[4]
 
-    rr, cc = ellipse_perimeter(int(z), int(x), int(b), int(a), orientation=theta)
-    points = np.column_stack((cc, rr))
-
-    z_col = points[:, 1]
-    idx_min = np.argmin(z_col)
-    idx_max = np.argmax(z_col)
-
-    upper_point = points[idx_max]
-    lower_point = points[idx_min]
-
-    return (upper_point, lower_point)
-
-def find_points2(ellipse):
-    '''
-    Find extreme points of the ellipse.
-    Input: ellipse parameters.
-    Output: p1, p2, p3, and p4.
-    '''
-
-    x = ellipse[0]
-    z = ellipse[1]
-    a = ellipse[2]
-    b = ellipse[3]
-    theta = ellipse[4]
-
+    d_x = np.sqrt(a**2*np.cos(theta)**2 + b**2*np.sin(theta)**2)
     d_z = np.sqrt(a**2*np.sin(theta)**2 + b**2*np.cos(theta)**2)
 
-    z_max = z + d_z
-    z_min = z - d_z
+    w_x = -d_z
+    w_y = ((a**2 - b**2)*np.sin(theta)*np.cos(theta))/d_z
 
-    x_max = x + ((a**2 - b**2)*np.sin(theta)*np.cos(theta))/d_z
-    x_min = x - ((a**2 - b**2)*np.sin(theta)*np.cos(theta))/d_z
+    # ----- Gemini -----
+    A = (np.cos(theta)**2)/(a**2) + (np.sin(theta)**2)/(b**2)
+    B = 2*np.sin(theta)*np.cos(theta)*((1/a**2) - (1/b**2))
+    C = (np.sin(theta)**2/(a**2)) + (np.cos(theta)**2/(b**2))
 
-    upper_point = (x_max, z_max)
-    lower_point = (x_min, z_min)
+    k = 1.0 / np.sqrt(np.abs(A*w_x**2 + B*w_x*w_y + C*w_y**2))
 
-    return (upper_point, lower_point)
+    # p2_2 = (x - k*w_x, z - k*w_y)
+    # p4_2 = (x + k*w_x, z + k*w_y)
 
+    p2_2 = (x + k*w_x, z + k*w_y)
+    p4_2 = (x - k*w_x, z - k*w_y)
+    # ----- ----- -----
+
+    p1_z = z + d_z
+    p3_z = z - d_z
+
+    p2_x = x - d_x
+    p4_x = x + d_x
+
+    p1_x = x + ((a**2 - b**2)*np.sin(theta)*np.cos(theta))/d_z
+    p3_x = x - ((a**2 - b**2)*np.sin(theta)*np.cos(theta))/d_z
+
+    p2_z = z - ((a**2 - b**2)*np.sin(theta)*np.cos(theta))/d_x
+    p4_z = z + ((a**2 - b**2)*np.sin(theta)*np.cos(theta))/d_x
+
+    p1 = (p1_x, p1_z)
+    p2 = (p2_x, p2_z)
+    p3 = (p3_x, p3_z)
+    p4 = (p4_x, p4_z)
+
+    return p1, p2, p3, p4, p2_2, p4_2
 
 
 def process_directory(directory_path, screen_resolution):
@@ -252,7 +384,7 @@ def animate_Point(data, resolution, first_frame, save=False):
     return
 
 
-def animate_Ellipse(data, resolution, first_frame, save=False):
+def animate_Ellipse(data, resolution, first_frame, name='none'):
     '''
     Create 3d animation
     '''
@@ -336,9 +468,12 @@ def animate_Ellipse(data, resolution, first_frame, save=False):
     animEllipse = animation.FuncAnimation(fig=fig, func=update, frames=len(xf), interval=60)
     plt.show()
 
-    if save == True:
+    if name != 'none':
+        writer = animation.HTMLWriter()
+        animation_file = './tmp/animation.html'
+        animEllipse.save(animation_file, writer=writer)
         filename = str(input('Type file name to save'))
-        aniEllipse.save(filename=f"{filename}-animation-{date}.gif")
+        animEllipse.save(filename=f"{name}-animation.gif")
 
     return
 
@@ -463,6 +598,7 @@ def fit_img2model(real_data, initial_guess, bike_parameters, boundaries):
     }
 
     for i in range(len(real_data['r_Cf_Cr_x'])):
+
         image_data['r_Cf_Cr_x'] = real_data['r_Cf_Cr_x'][i]
         image_data['r_Cf_Cr_z'] = real_data['r_Cf_Cr_z'][i]
         image_data['r_Cr_O_x'] = real_data['r_Cr_O_x'][i]
