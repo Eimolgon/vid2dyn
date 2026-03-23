@@ -18,7 +18,8 @@ from utils import (
     animate_Point,
     animate_Ellipse,
     data4model,
-    fit_img2model
+    fit_img2model,
+    plot_mbd_model_2d
 )
 
 
@@ -88,9 +89,10 @@ boundaries = (lower_bound, upper_bound)
 
 # === Initial guess ===
 
+# Values for frame 417
 x0 = np.array([
     np.deg2rad(0),
-    np.deg2rad(-30), 
+    np.deg2rad(-21.8), 
     np.deg2rad(0),
     np.deg2rad(0),
     180,
@@ -101,8 +103,8 @@ x0 = np.array([
 
 if args.single_frame != '0':
 
-    # test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000417.txt'
-    test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000483.txt'
+    test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000417.txt'
+    # test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000483.txt'
     # test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000480.txt'
 
     # data_points = readFile(args.single_frame)
@@ -135,12 +137,20 @@ if args.single_frame != '0':
         'r_P3f_Cf_z' : [p3_f[1] - zf]
     }
 
-    bike_params['r'] = 2*br
+    bike_params['r'] = 1*br
     print(f'Max wheel radius = {bike_params['r']}')
 
-    results = fit_img2model(imgdata, x0, bike_params, boundaries)
+    results_sf, state_sf = fit_img2model(imgdata, x0, bike_params, boundaries)
+    print(f'phi = {np.rad2deg(state_sf[-1][0])}')
+    print(f'theta = {np.rad2deg(state_sf[-1][1])}')
+    print(f'psi = {np.rad2deg(state_sf[-1][2])}')
+    print(f'delta = {np.rad2deg(state_sf[-1][3])}')
+    print(f'x = {state_sf[-1][4]}')
+    print(f'y = {state_sf[-1][5]}')
+    print(f'z = {state_sf[-1][6]}')
 
-    if args.plot != '0':
+
+    if args.plot == 'e':
         
         plt.plot(xf, zf, 'ok')
         plt.scatter(p1_f[0], p1_f[1], marker='x', color='red')
@@ -178,6 +188,13 @@ if args.single_frame != '0':
         plt.gca().set_aspect('equal')
         plt.grid()
         plt.show()
+
+        plot_mbd_model_2d(bike_params, x0, 'xz')
+        plot_mbd_model_2d(bike_params, state_sf[-1], 'xz')
+
+    elif args.plot == 'mbd':
+        plot_mbd_model_2d(bike_params, x0, 'xz')
+        # plot_mbd_model_2d(bike_params, results_sf, 'xz')
 
 elif args.data != '0':
 

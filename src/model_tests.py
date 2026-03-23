@@ -47,55 +47,56 @@ r_P4f_O_x = P4f.pos_from(O).dot(N.x)
 r_P4f_O_y = P4f.pos_from(O).dot(N.y)
 r_P4f_O_z = P4f.pos_from(O).dot(N.z)
 
-
-
 r_Cr_O_y = Cr.pos_from(O).dot(N.y)
 
-eval_rear_wheel_y = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cr_O_y)
 
-eval_steering_x = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_S_O_x)
-eval_steering_y = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_S_O_y)
-eval_steering_z = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_S_O_z)
+variables = (phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r)
 
-eval_fork_x = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Q_O_x)
-eval_fork_y = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Q_O_y)
-eval_fork_z = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Q_O_z)
+eval_rear_wheel_y = sp.lambdify(variables, r_Cr_O_y)
 
-eval_trail_x = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cf_O_x)
-eval_trail_y = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cf_O_y)
-eval_trail_z = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_Cf_O_z)
+eval_steering_x = sp.lambdify(variables, r_S_O_x)
+eval_steering_y = sp.lambdify(variables, r_S_O_y)
+eval_steering_z = sp.lambdify(variables, r_S_O_z)
 
-eval_rear_contact_x = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P3r_O_x)
-eval_rear_contact_y = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P3r_O_y)
-eval_rear_contact_z = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P3r_O_z)
+eval_fork_x = sp.lambdify(variables, r_Q_O_x)
+eval_fork_y = sp.lambdify(variables, r_Q_O_y)
+eval_fork_z = sp.lambdify(variables, r_Q_O_z)
 
-eval_front_contact_x = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P3f_O_x)
-eval_front_contact_y = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P3f_O_y)
-eval_front_contact_z = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P3f_O_z)
+eval_trail_x = sp.lambdify(variables, r_Cf_O_x)
+eval_trail_y = sp.lambdify(variables, r_Cf_O_y)
+eval_trail_z = sp.lambdify(variables, r_Cf_O_z)
 
-eval_rear_top_x = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P1r_O_x)
-eval_rear_top_y = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P1r_O_y)
-eval_rear_top_z = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P1r_O_z)
+eval_rear_contact_x = sp.lambdify(variables, r_P3r_O_x)
+eval_rear_contact_y = sp.lambdify(variables, r_P3r_O_y)
+eval_rear_contact_z = sp.lambdify(variables, r_P3r_O_z)
 
-eval_front_top_x = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P1f_O_x)
-eval_front_top_y = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P1f_O_y)
-eval_front_top_z = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P1f_O_z)
+eval_front_contact_x = sp.lambdify(variables, r_P3f_O_x)
+eval_front_contact_y = sp.lambdify(variables, r_P3f_O_y)
+eval_front_contact_z = sp.lambdify(variables, r_P3f_O_z)
 
-eval_rear_p2_x = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P2r_O_x)
-eval_rear_p2_y = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P2r_O_y)
-eval_rear_p2_z = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P2r_O_z)
+eval_rear_top_x = sp.lambdify(variables, r_P1r_O_x)
+eval_rear_top_y = sp.lambdify(variables, r_P1r_O_y)
+eval_rear_top_z = sp.lambdify(variables, r_P1r_O_z)
 
-eval_front_p2_x = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P2f_O_x)
-eval_front_p2_y = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P2f_O_y)
-eval_front_p2_z = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P2f_O_z)
+eval_front_top_x = sp.lambdify(variables, r_P1f_O_x)
+eval_front_top_y = sp.lambdify(variables, r_P1f_O_y)
+eval_front_top_z = sp.lambdify(variables, r_P1f_O_z)
 
-eval_rear_p4_x = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P4r_O_x)
-eval_rear_p4_y = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P4r_O_y)
-eval_rear_p4_z = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P4r_O_z)
+eval_rear_p2_x = sp.lambdify(variables, r_P2r_O_x)
+eval_rear_p2_y = sp.lambdify(variables, r_P2r_O_y)
+eval_rear_p2_z = sp.lambdify(variables, r_P2r_O_z)
 
-eval_front_p4_x = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P4f_O_x)
-eval_front_p4_y = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P4f_O_y)
-eval_front_p4_z = sp.lambdify((phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r), r_P4f_O_z)
+eval_front_p2_x = sp.lambdify(variables, r_P2f_O_x)
+eval_front_p2_y = sp.lambdify(variables, r_P2f_O_y)
+eval_front_p2_z = sp.lambdify(variables, r_P2f_O_z)
+
+eval_rear_p4_x = sp.lambdify(variables, r_P4r_O_x)
+eval_rear_p4_y = sp.lambdify(variables, r_P4r_O_y)
+eval_rear_p4_z = sp.lambdify(variables, r_P4r_O_z)
+
+eval_front_p4_x = sp.lambdify(variables, r_P4f_O_x)
+eval_front_p4_y = sp.lambdify(variables, r_P4f_O_y)
+eval_front_p4_z = sp.lambdify(variables, r_P4f_O_z)
 
 
 # subs = (0, 0, 0, 0, 500, 0, 355.6, 1000, 500, 100, 355.6)

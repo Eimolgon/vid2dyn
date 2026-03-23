@@ -5,7 +5,7 @@ import numpy as np
 import sympy as sp
 import matplotlib.pyplot as plt
 from collections import defaultdict
-from bike_model import residual_eqs
+from bike_model import *
 from matplotlib.patches import Ellipse
 import matplotlib.animation as animation
 from matplotlib import collections as mc
@@ -579,6 +579,7 @@ def fit_img2model(real_data, initial_guess, bike_parameters, boundaries):
     '''
     x0 = initial_guess
     results_history = []
+    x0_history = [x0]
 
     lower_bound, upper_bound = boundaries
 
@@ -616,8 +617,72 @@ def fit_img2model(real_data, initial_guess, bike_parameters, boundaries):
                                             args = (image_data, bike_parameters), 
                                             bounds = (lower_bound, upper_bound))
         results_history.append(results_iteration)
+        x0_history.append(results_iteration['x'])
 
         # Update initial guess
         x0 = results_iteration['x'].copy()
 
-    return results_history
+    return results_history, x0_history
+
+
+def plot_mbd_model_2d(bike_parameters:dict, state, plane):
+    '''
+    Create 2-dimensional plot of the model at the given state.
+    Input: state-space vector, plane of the projection. 
+    (phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r)
+    Output: plot of the model.
+    '''
+
+    subs = (state[0], state[1], state[2], state[3], state[4], state[5], 
+            state[6], bike_parameters['lr'], bike_parameters['lf1'],
+            bike_parameters['lf2'], bike_parameters['r'])
+    
+    
+    Cr_point = (eval_f03(*subs), eval_p01(*subs), eval_f04(*subs))
+    S_point = (eval_p02(*subs), eval_p03(*subs), eval_p04(*subs))
+    Q_point = (eval_p05(*subs), eval_p06(*subs), eval_p07(*subs))
+    Cf_point = (eval_p08(*subs), eval_p09(*subs), eval_p10(*subs))
+
+    p1r_point = (eval_p11(*subs), eval_p12(*subs), eval_p13(*subs))
+    p3r_point = (eval_p23(*subs), eval_p24(*subs), eval_p25(*subs))
+
+    p1f_point = (eval_p14(*subs), eval_p15(*subs), eval_p16(*subs))
+    p3f_point = (eval_p26(*subs), eval_p27(*subs), eval_p28(*subs))
+
+    rear_frame_x, rear_frame_y, rear_frame_z = [Cr_point[0], S_point[0]], \
+        [Cr_point[0], S_point[0]], [Cr_point[2], S_point[2]]
+    
+    front_frame_x, front_frame_y, front_frame_z = [S_point[0], Q_point[0]], \
+        [S_point[1], Q_point[1]], [S_point[2], Q_point[2]]
+    
+    trail_x, trail_y, trail_z = [Q_point[0], Cf_point[0]], \
+        [Q_point[1], Cf_point[1]], [Q_point[2], Cf_point[2]]
+    
+    plt.plot(rear_frame_x, rear_frame_z, marker='o', color='C0')
+    plt.plot(front_frame_x, front_frame_z, marker='o', color='C2')
+    plt.plot(trail_x, trail_z, marker='o', color='C1')
+
+    plt.scatter(Cr_point[0], Cr_point[2], marker='x', color='C0')
+    plt.scatter(Cf_point[0], Cf_point[2], marker='x', color='C1')
+    
+    plt.scatter(p1r_point[0], p1r_point[2], facecolors='none', edgecolors='C9', s=50)
+    plt.scatter(p3r_point[0], p3r_point[2], facecolors='none', edgecolors='C8', s=50)
+    plt.scatter(p1f_point[0], p1f_point[2], facecolors='none', edgecolors='C9', s=50)
+    plt.scatter(p3f_point[0], p3f_point[2], facecolors='none', edgecolors='C8', s=50)
+
+    plt.xlim(0, 1920)
+    plt.ylim(0, 1080)
+    plt.gca().set_aspect('equal')
+    plt.grid()
+    plt.show()
+
+    return
+
+def plot_mbd_model_3d(state):
+    '''
+    Create 3-dimensional plot of the model at the given state.
+    Input: state-space vector.
+    Output: plot of the model.
+    '''
+
+    return
