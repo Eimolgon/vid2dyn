@@ -103,22 +103,10 @@ eval_front_p4_z = sp.lambdify(variables, r_P4f_O_z)
 # subs = (0, 0, 0, 0, 0, 0, 0, 1000, 500, 100, 500)
 
 
-subs = (np.deg2rad(-10), 
-        np.deg2rad(-21.8014125), 
-        np.deg2rad(10), 
-        np.deg2rad(25), 
-        5, 
-        0, 
-        5, 
-        4, 
-        2, 
-        1, 
-        2)
-
-# subs = (0, 
+# subs = (np.deg2rad(-10), 
 #         np.deg2rad(-21.8014125), 
-#         0, 
-#         0, 
+#         np.deg2rad(10), 
+#         np.deg2rad(25), 
 #         5, 
 #         0, 
 #         5, 
@@ -126,6 +114,18 @@ subs = (np.deg2rad(-10),
 #         2, 
 #         1, 
 #         2)
+
+subs = (np.deg2rad(-5), 
+        np.deg2rad(-30), 
+        np.deg2rad(70), 
+        np.deg2rad(15), 
+        5, 
+        0, 
+        5, 
+        4, 
+        2, 
+        1, 
+        2)
 
 
 
@@ -218,7 +218,6 @@ circle_pts_f = np.array([center_circle_f + radius_circle_f * np.cos(t) * u_f +
                          radius_circle_f * np.sin(t) * v_f for t in theta_circle_f])
 
 cx_f, cy_f, cz_f = circle_pts_f[:, 0], circle_pts_f[:, 1], circle_pts_f[:, 2]
-
 
 
 

@@ -625,12 +625,11 @@ def fit_img2model(real_data, initial_guess, bike_parameters, boundaries):
     return results_history, x0_history
 
 
-def plot_mbd_model_2d(bike_parameters:dict, state, plane):
+def points2plot(bike_parameters:dict, state):
     '''
-    Create 2-dimensional plot of the model at the given state.
-    Input: state-space vector, plane of the projection. 
-    (phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r)
-    Output: plot of the model.
+    Find the points to plot the model in 2d and 3d.
+    Input: bicycle parameters and state.
+    Output: vector with points.
     '''
 
     subs = (state[0], state[1], state[2], state[3], state[4], state[5], 
@@ -649,6 +648,64 @@ def plot_mbd_model_2d(bike_parameters:dict, state, plane):
     p1f_point = (eval_p14(*subs), eval_p15(*subs), eval_p16(*subs))
     p3f_point = (eval_p26(*subs), eval_p27(*subs), eval_p28(*subs))
 
+    p2r_point = (eval_p17(*subs), eval_p18(*subs), eval_p19(*subs))
+    p4r_point = (eval_p29(*subs), eval_p30(*subs), eval_p31(*subs))
+    
+    p2f_point = (eval_p20(*subs), eval_p21(*subs), eval_p22(*subs))
+    p4f_point = (eval_p32(*subs), eval_p33(*subs), eval_p34(*subs))
+
+    
+    return [(Cr_point, S_point, Q_point, Cf_point), 
+            (p1r_point, p3r_point), (p1f_point, p3f_point),
+            (p2r_point, p4r_point), (p2f_point, p4f_point)]
+
+
+def pt2circle(p1, p2, p3, p4):
+    pts = np.array([
+        [p1[0], p1[1], p1[2]],
+        [p2[0], p2[1], p2[2]],
+        [p3[0], p3[1], p3[2]],
+        [p4[0], p4[1], p4[2]],
+    ])
+
+    center_circle = np.mean(pts, axis=0)
+    radius_circle = np.linalg.norm(pts[0] - center_circle)
+
+    u = (pts[0] - center_circle)/np.linalg.norm(pts[0] - center_circle)
+    w = np.cross(pts[0] - center_circle, pts[1] - center_circle) 
+    w /= np.linalg.norm(w)
+
+    v = np.cross(w, u)
+    theta_circle = np.linspace(0, 2 * np.pi, 100)
+
+    circle_pts = np.array([center_circle + radius_circle * np.cos(t) * u + 
+                         radius_circle * np.sin(t) * v for t in theta_circle])
+
+    cx, cy, cz = circle_pts[:, 0], circle_pts[:, 1], circle_pts[:, 2]
+
+    return cx, cy, cz
+
+
+def plot_mbd_model_2d(ax, bike_parameters:dict, state, source):
+    '''
+    Create 2-dimensional plot of the model at the given state.
+    Input: state-space vector, plane of the projection. 
+    (phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r)
+    Output: plot of the model.
+    '''
+
+    if source == 'guess':
+        colors={'rear_frame': 'blue',
+                'front_frame': 'green',
+                'trail': 'red',
+                'p1': 'purple',
+                'p3': 'yellow'}
+
+    frame_points, rw_points, fw_points, r_pts_2, f_pts2 = points2plot(bike_parameters, state)
+    Cr_point, S_point, Q_point, Cf_point = frame_points
+    p1r_point, p3r_point = rw_points
+    p1f_point, p3f_point = fw_points
+
     rear_frame_x, rear_frame_y, rear_frame_z = [Cr_point[0], S_point[0]], \
         [Cr_point[0], S_point[0]], [Cr_point[2], S_point[2]]
     
@@ -658,31 +715,95 @@ def plot_mbd_model_2d(bike_parameters:dict, state, plane):
     trail_x, trail_y, trail_z = [Q_point[0], Cf_point[0]], \
         [Q_point[1], Cf_point[1]], [Q_point[2], Cf_point[2]]
     
-    plt.plot(rear_frame_x, rear_frame_z, marker='o', color='C0')
-    plt.plot(front_frame_x, front_frame_z, marker='o', color='C2')
-    plt.plot(trail_x, trail_z, marker='o', color='C1')
+    ax.plot(rear_frame_x, rear_frame_z, marker='o', color='C0')
+    ax.plot(front_frame_x, front_frame_z, marker='o', color='C2')
+    ax.plot(trail_x, trail_z, marker='o', color='C1')
 
-    plt.scatter(Cr_point[0], Cr_point[2], marker='x', color='C0')
-    plt.scatter(Cf_point[0], Cf_point[2], marker='x', color='C1')
+    ax.scatter(Cr_point[0], Cr_point[2], marker='x', color='C0')
+    ax.scatter(Cf_point[0], Cf_point[2], marker='x', color='C1')
     
-    plt.scatter(p1r_point[0], p1r_point[2], facecolors='none', edgecolors='C9', s=50)
-    plt.scatter(p3r_point[0], p3r_point[2], facecolors='none', edgecolors='C8', s=50)
-    plt.scatter(p1f_point[0], p1f_point[2], facecolors='none', edgecolors='C9', s=50)
-    plt.scatter(p3f_point[0], p3f_point[2], facecolors='none', edgecolors='C8', s=50)
+    ax.scatter(p1r_point[0], p1r_point[2], facecolors='none', edgecolors='C9', s=50)
+    ax.scatter(p3r_point[0], p3r_point[2], facecolors='none', edgecolors='C8', s=50)
+    ax.scatter(p1f_point[0], p1f_point[2], facecolors='none', edgecolors='C9', s=50)
+    ax.scatter(p3f_point[0], p3f_point[2], facecolors='none', edgecolors='C8', s=50)
 
-    plt.xlim(0, 1920)
-    plt.ylim(0, 1080)
-    plt.gca().set_aspect('equal')
-    plt.grid()
-    plt.show()
+    ax.grid()
 
     return
 
-def plot_mbd_model_3d(state):
+def plot_mbd_model_3d(bike_parameters:dict, state):
     '''
     Create 3-dimensional plot of the model at the given state.
     Input: state-space vector.
     Output: plot of the model.
     '''
+
+    frame_points, rw_points, fw_points, r_pts_2, f_pts_2 = points2plot(bike_parameters, state)
+    Cr_point, S_point, Q_point, Cf_point = frame_points
+    p1r_point, p3r_point = rw_points
+    p1f_point, p3f_point = fw_points
+
+    p2r_point, p4r_point = r_pts_2
+    p2f_point, p4f_point = f_pts_2
+
+    cx_r, cy_r, cz_r = pt2circle(p1r_point, p2r_point, p3r_point, p4r_point)
+    cx_f, cy_f, cz_f = pt2circle(p1f_point, p2f_point, p3f_point, p4f_point)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    ax.plot([Cr_point[0], S_point[0]],
+            [Cr_point[1], S_point[1]],
+            [Cr_point[2], S_point[2]], marker='o', color='C0', label='Frame')
+
+    ax.plot([S_point[0], Q_point[0]],
+            [S_point[1], Q_point[1]],
+            [S_point[2], Q_point[2]], marker='o', color='C2', label='Steering')
+    
+    ax.plot([Q_point[0], Cf_point[0]],
+            [Q_point[1], Cf_point[1]],
+            [Q_point[2], Cf_point[2]], marker='o', color='C1', label='Fork')
+    
+    ax.scatter(p1r_point[0], p1r_point[1], p1r_point[2], marker='x', color='red')
+    ax.scatter(p3r_point[0], p3r_point[1], p3r_point[2], marker='x', color='black')
+
+    ax.scatter(p1f_point[0], p1f_point[1], p1f_point[2], marker='^', color='red')
+    ax.scatter(p3f_point[0], p3f_point[1], p3f_point[2], marker='^', color='black')
+    
+    ax.plot(cx_r, cy_r, cz_r, color='black', linestyle='-')
+    ax.plot(cx_f, cy_f, cz_f, color='black', linestyle='-')
+
+    ax.set_xlabel('X axis')
+    ax.set_ylabel('Y axis')
+    ax.set_zlabel('Z axis')
+    plt.show()
+
+    return
+
+def plot_raw_data(ax, raw_data, screen_resolution, plot_color):
+    '''
+    Plot original dots in 2d plane.
+    '''
+
+    ax.scatter(raw_data[:, 0]*screen_resolution[0], (1 - raw_data[:, 1])*screen_resolution[1], 
+               facecolors='none', edgecolors=plot_color)
+    ax.grid()
+
+    return
+
+def plot_dots(ax, dots, wheel):
+    '''
+    Plot objective points.
+    '''
+
+    if wheel == 'front':
+        colors = {'p1': 'red', 'p3': 'black', 'center': 'C1', 'mark':'^'}
+    elif wheel == 'rear':
+        colors = {'p1': 'red', 'p3': 'black', 'center': 'C0', 'mark':'x'}
+
+    ax.scatter(dots[0], dots[1], edgecolor=colors['center'], facecolors='none', marker='s')
+    ax.scatter(dots[2][0], dots[2][1], color=colors['p1'], marker=colors['mark'])
+    ax.scatter(dots[3][0], dots[3][1], color=colors['p3'], marker=colors['mark'])
+    ax.grid()
 
     return

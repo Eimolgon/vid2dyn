@@ -19,7 +19,9 @@ from utils import (
     animate_Ellipse,
     data4model,
     fit_img2model,
-    plot_mbd_model_2d
+    plot_mbd_model_2d,
+    plot_mbd_model_3d,
+    plot_dots
 )
 
 
@@ -89,23 +91,49 @@ boundaries = (lower_bound, upper_bound)
 
 # === Initial guess ===
 
+# Values for frame 396
+# x0 = np.array([
+#     np.deg2rad(-5),
+#     np.deg2rad(-15), 
+#     np.deg2rad(-45),
+#     np.deg2rad(15),
+#     400,
+#     0,
+#     600
+# ])
+
+
 # Values for frame 417
+# x0 = np.array([
+#     np.deg2rad(0),
+#     np.deg2rad(-21.8), 
+#     np.deg2rad(0),
+#     np.deg2rad(0),
+#     180,
+#     0,
+#     400
+# ])
+
+# Values for frame 480
 x0 = np.array([
-    np.deg2rad(0),
-    np.deg2rad(-21.8), 
-    np.deg2rad(0),
-    np.deg2rad(0),
-    180,
+    np.deg2rad(-5),
+    np.deg2rad(-30), 
+    np.deg2rad(75),
+    np.deg2rad(15),
+    1300,
     0,
-    400
+    650
 ])
+
 
 
 if args.single_frame != '0':
 
-    test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000417.txt'
-    # test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000483.txt'
+    # test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000396.txt'
+    test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000412.txt'
+    # test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000417.txt'
     # test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000480.txt'
+    # test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000483.txt'
 
     # data_points = readFile(args.single_frame)
     data_points = readFile(test_frame_single)
@@ -118,9 +146,20 @@ if args.single_frame != '0':
     xf, zf, af, bf, theta_f = ellipse_front
     xr, zr, ar, br, theta_r = ellipse_rear
 
+    print(f'af:{af}, bf:{bf}, theta:{np.rad2deg(theta_f)} \n')
+    print(f'angle2cam:{np.rad2deg(np.arccos(bf/af))}')
+
+
     p1_f, p2_f, p3_f, p4_f, p2_f_2, p4_f_2 = find_points(ellipse_front)
     p1_r, p2_r, p3_r, p4_r, p2_r_2, p4_r_2 = find_points(ellipse_rear)
 
+    vertical_line = (p1_f[1] - p3_f[1])/2
+    horizontal_line = (p4_f[0] - p2_f[0])/2
+    print(f'vertical:{vertical_line}, horizontal:{horizontal_line}')
+    print(f'new angle2cam:{np.rad2deg(np.arccos(horizontal_line/vertical_line))}')
+
+    plot_points_f = (xf, zf, p1_f, p3_f)
+    plot_points_r = (xr, zr, p1_r, p3_r)
 
     imgdata = {
         'r_Cf_Cr_x' : [xf - xr],
@@ -137,8 +176,9 @@ if args.single_frame != '0':
         'r_P3f_Cf_z' : [p3_f[1] - zf]
     }
 
-    bike_params['r'] = 1*br
-    print(f'Max wheel radius = {bike_params['r']}')
+    bike_params['r'] = 2*br
+
+    # print(f'Max wheel radius = {bike_params['r']}')
 
     results_sf, state_sf = fit_img2model(imgdata, x0, bike_params, boundaries)
     print(f'phi = {np.rad2deg(state_sf[-1][0])}')
@@ -149,27 +189,24 @@ if args.single_frame != '0':
     print(f'y = {state_sf[-1][5]}')
     print(f'z = {state_sf[-1][6]}')
 
+    state_sf[-1][4] = state_sf[-1][4] + assumed_origin[0]
+    state_sf[-1][6] = state_sf[-1][6] + assumed_origin[1]
 
     if args.plot == 'e':
         
         plt.plot(xf, zf, 'ok')
         plt.scatter(p1_f[0], p1_f[1], marker='x', color='red')
-        # plt.scatter(p2_f[0], p2_f[1], marker='s', color='blue')
         plt.scatter(p3_f[0], p3_f[1], marker='x', color='black')
-        # plt.scatter(p4_f[0], p4_f[1], marker='^', color='green')
-        # plt.scatter(front_data[:, 0]*screen_resolution[0], (1 - front_data[:, 1])*screen_resolution[1], facecolors='none', edgecolors='red')
-        # plt.scatter(p2_f_2[0], p2_f_2[1], marker='s', color='blue', facecolor='none')
-        # plt.scatter(p4_f_2[0], p4_f_2[1], marker='^', color='green', facecolor='none')
+
+        plt.scatter(p2_f_2[0], p2_f_2[1], marker='p', color='red')
+        plt.scatter(p4_f_2[0], p4_f_2[1], marker='h', color='black')
 
         plt.plot(xr, zr, 'ok')
         plt.scatter(p1_r[0], p1_r[1], marker='x', color='red')
-        # plt.scatter(p2_r[0], p2_r[1], marker='s', color='blue')
         plt.scatter(p3_r[0], p3_r[1], marker='x', color='black')
-        # plt.scatter(p4_r[0], p4_r[1], marker='^', color='green')
-        # plt.scatter(rear_data[:, 0]*screen_resolution[0], (1 - rear_data[:, 1])*screen_resolution[1], facecolors='none', edgecolors='blue')
-        # plt.scatter(p2_r_2[0], p2_r_2[1], marker='s', color='blue', facecolor='none')
-        # plt.scatter(p4_r_2[0], p4_r_2[1], marker='^', color='green', facecolor='none')
 
+        plt.scatter(p2_r_2[0], p2_r_2[1], marker='p', color='red')
+        plt.scatter(p4_r_2[0], p4_r_2[1], marker='h', color='black')
 
         ell_patch_f = Ellipse((xf, zf), width = 2*af, height = 2*bf,
                       angle = theta_f*180/np.pi, edgecolor='blue', 
@@ -187,14 +224,37 @@ if args.single_frame != '0':
         plt.ylim(0, 1080)
         plt.gca().set_aspect('equal')
         plt.grid()
+
+        fig, axs = plt.subplots()
+
+        # plot_mbd_model_2d(axs,bike_params, x0, 'xz')
+        plot_mbd_model_2d(axs, bike_params, state_sf[-1], 'xz')
         plt.show()
 
-        plot_mbd_model_2d(bike_params, x0, 'xz')
-        plot_mbd_model_2d(bike_params, state_sf[-1], 'xz')
+        # fig2, ax2 = plt.subplots(2,2)
+
 
     elif args.plot == 'mbd':
-        plot_mbd_model_2d(bike_params, x0, 'xz')
-        # plot_mbd_model_2d(bike_params, results_sf, 'xz')
+
+        fig, axs = plt.subplots()
+
+
+        plot_dots(axs, plot_points_f, 'front')
+        plt.scatter(front_data[:, 0]*screen_resolution[0], (1 - front_data[:, 1])*screen_resolution[1], facecolors='none', edgecolors='red', s=10)
+
+        plot_dots(axs, plot_points_r, 'rear')
+        plt.scatter(rear_data[:, 0]*screen_resolution[0], (1 - rear_data[:, 1])*screen_resolution[1], facecolors='none', edgecolors='blue', s=10)
+
+        # plot_mbd_model_2d(axs,bike_params, x0, 'guess')
+        plot_mbd_model_2d(axs, bike_params, state_sf[-1], 'model')
+        axs.grid()
+
+        plt.xlim(0, 1920)
+        plt.ylim(0, 1080)
+        plt.grid()
+        plt.show()
+
+        plot_mbd_model_3d(bike_params, state_sf[-1])
 
 elif args.data != '0':
 

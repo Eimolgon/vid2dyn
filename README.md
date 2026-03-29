@@ -17,6 +17,13 @@ Example for filtered data with csv output:
 `python ellipse2data.py /path/to/folder --output filename.csv --cutoff 1.5 --fs 30`
 
 
+Example usage for the big code for single frame and plot the model:
+`python src/frame_data.py -sf 1 -p mbd`
+
+Example for data ellipse animation:
+`python src/frame_data.py -d cut -a3d`
+
+
 To-Do
 -------
 
