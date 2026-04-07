@@ -3,6 +3,7 @@ import time
 import datetime
 import argparse
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 from scipy.optimize import least_squares
@@ -21,7 +22,9 @@ from utils import (
     fit_img2model,
     plot_mbd_model_2d,
     plot_mbd_model_3d,
-    plot_dots
+    plot_dots,
+    fitEllipse_conic,
+    get_normal
 )
 
 
@@ -45,7 +48,7 @@ parser.add_argument('-d', '--data',
                     type=str, default='0',
                     help='Choose data directory')
 parser.add_argument('-sf', '--single_frame', 
-                    default='0', type=str,
+                    default='0', type=int,
                     help='Extract data from a single frame, requires route to ' \
                     'file')
 parser.add_argument('-p', '--plot',
@@ -53,6 +56,9 @@ parser.add_argument('-p', '--plot',
                     help='Allow plotting of the results')
 parser.add_argument('--save', default='none', type=str,
                     help='Save plots')
+parser.add_argument('-csv', '--save_csv',
+                    default=False, action='store_true',
+                    help='Store solver results in csv file')
 
 
 plot_group.add_argument('-a2d', '--animate_points', 
@@ -81,9 +87,11 @@ bike_params = {
     'lr': 140,
     'lf1': 50,
     'lf2': 10,
-    'r': 0 
+    'rf': 75,
+    'rr': 75 
 }
 
+# ----- Solver boundaries -----
 lower_bound = [-np.pi/2, -np.pi/2, -np.pi/2, -np.pi/2, 0, -np.inf, 0]
 upper_bound = [np.pi/2, np.pi/2, np.pi/2, np.pi/2, 1920, np.inf, 1080]
 boundaries = (lower_bound, upper_bound)
@@ -115,48 +123,110 @@ boundaries = (lower_bound, upper_bound)
 # ])
 
 # Values for frame 480
-x0 = np.array([
-    np.deg2rad(-5),
-    np.deg2rad(-30), 
-    np.deg2rad(75),
-    np.deg2rad(15),
-    1300,
-    0,
-    650
-])
+# x0 = np.array([
+#     np.deg2rad(-5),
+#     np.deg2rad(-30), 
+#     np.deg2rad(75),
+#     np.deg2rad(15),
+#     1300,
+#     0,
+#     650
+# ])
+
+
+if args.single_frame < 400 :
+    x0 = np.array([
+        np.deg2rad(-5),
+        np.deg2rad(-15), 
+        np.deg2rad(-45),
+        np.deg2rad(15),
+        400,
+        0,
+        600
+    ])
+elif args.single_frame < 470 :
+    x0 = np.array([
+        np.deg2rad(0),
+        np.deg2rad(-21.8), 
+        np.deg2rad(0),
+        np.deg2rad(0),
+        180,
+        0,
+        400
+    ])
+else:
+    x0 = np.array([
+        np.deg2rad(-5),
+        np.deg2rad(-30), 
+        np.deg2rad(75),
+        np.deg2rad(15),
+        1300,
+        0,
+        650
+    ])
 
 
 
-if args.single_frame != '0':
+if args.single_frame != 0 :
 
-    # test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000396.txt'
-    test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000412.txt'
-    # test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000417.txt'
-    # test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000480.txt'
-    # test_frame_single = '/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000483.txt'
+    test_frame_single = f'/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000{args.single_frame}.txt'
 
-    # data_points = readFile(args.single_frame)
+    # Process raw data
     data_points = readFile(test_frame_single)
     front_data = data_points[0]['points']
     rear_data = data_points[1]['points']
 
+    # Fit ellipse to data
     ellipse_front = fitEllipse(front_data, screen_resolution)
     ellipse_rear = fitEllipse(rear_data, screen_resolution)
 
+
+    # Extract parameters from the fitted ellipses
     xf, zf, af, bf, theta_f = ellipse_front
     xr, zr, ar, br, theta_r = ellipse_rear
 
-    print(f'af:{af}, bf:{bf}, theta:{np.rad2deg(theta_f)} \n')
-    print(f'angle2cam:{np.rad2deg(np.arccos(bf/af))}')
+    # Check travel direction
+    if xf > xr:
+        travel_direction = 'right'
+    elif xf < xr:
+        travel_direction = 'left'
 
+    # Obtain projected angles of the ellipses
+    if af > bf:
+        angle_ellipse_f = np.arccos(bf/af)
+    else:
+        angle_ellipse_f = 0
 
-    p1_f, p2_f, p3_f, p4_f, p2_f_2, p4_f_2 = find_points(ellipse_front)
-    p1_r, p2_r, p3_r, p4_r, p2_r_2, p4_r_2 = find_points(ellipse_rear)
+    if ar > br:
+        angle_ellipse_r = np.arccos(br/ar)    
+    else: 
+        angle_ellipse_r = 0
 
-    vertical_line = (p1_f[1] - p3_f[1])/2
-    horizontal_line = (p4_f[0] - p2_f[0])/2
-    print(f'vertical:{vertical_line}, horizontal:{horizontal_line}')
-    print(f'new angle2cam:{np.rad2deg(np.arccos(horizontal_line/vertical_line))}')
+    # ----- This is just another test ----- 
+    aff,bff,cff,dff,eff,fff = fitEllipse_conic(front_data, screen_resolution)
+    normal_f = get_normal(aff,bff,cff,dff,eff,fff)
+
+    arr, brr, crr, drr, err, frr = fitEllipse_conic(rear_data, screen_resolution)
+    normal_r = get_normal(arr, brr, crr, drr, err, frr)
+
+    print(f'normal front: {normal_f}')
+    new_angle2camera_f = normal_f/np.linalg.norm(normal_f)
+
+    print(f'normal rear: {normal_r}')
+    new_angle2camera_r = normal_r/np.linalg.norm(normal_r)
+    
+    print(f'old angle f: {np.rad2deg(angle_ellipse_f):.2f}')
+    print(f'new angle f: {np.rad2deg(new_angle2camera_f[1]):.2f}')
+
+    print(f'old angle r: {np.rad2deg(angle_ellipse_r):.2f}')
+    print(f'new angle r: {np.rad2deg(new_angle2camera_r[1]):.2f}')
+
+    # ----- ----- ----- ----- -----
+
+    # Find extreme points of the ellipses
+    p1_f, p2_f, p3_f, p4_f, p2_f_2, p4_f_2 = find_points(ellipse_front, travel_direction)
+    p1_r, p2_r, p3_r, p4_r, p2_r_2, p4_r_2 = find_points(ellipse_rear, travel_direction)
+
 
     plot_points_f = (xf, zf, p1_f, p3_f)
     plot_points_r = (xr, zr, p1_r, p3_r)
@@ -164,8 +234,8 @@ if args.single_frame != '0':
     imgdata = {
         'r_Cf_Cr_x' : [xf - xr],
         'r_Cf_Cr_z' : [zf - zr],
-        'r_Cr_O_x' : [xr - assumed_origin[0]],
-        'r_Cr_O_z' : [zr - assumed_origin[1]],
+        'r_Cr_O_x' : [xr],
+        'r_Cr_O_z' : [zr],
         'r_P1r_Cr_x' : [p1_r[0] - xr],
         'r_P1r_Cr_z' : [p1_r[1] - zr],
         'r_P3r_Cr_x' : [p3_r[0] - xr],
@@ -173,24 +243,62 @@ if args.single_frame != '0':
         'r_P1f_Cf_x' : [p1_f[0] - xf],
         'r_P1f_Cf_z' : [p1_f[1] - zf],
         'r_P3f_Cf_x' : [p3_f[0] - xf],
-        'r_P3f_Cf_z' : [p3_f[1] - zf]
+        'r_P3f_Cf_z' : [p3_f[1] - zf],
+        'r_Q_S_x' : [(np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) - 
+                     np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
+                     np.cos(theta_f - theta_r))*np.sin(theta_f)/ \
+                        np.sqrt((np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) 
+                                 - np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
+                                 np.cos(theta_f - theta_r))**2 + 
+                                 np.sin(angle_ellipse_r)**2*
+                                 np.sin(theta_f - theta_r)**2) + \
+                                    np.sin(angle_ellipse_r)*\
+                                        np.sin(theta_f - theta_r)*\
+                                            np.cos(angle_ellipse_f)*\
+                                                np.cos(theta_f)/ \
+                                                    np.sqrt((np.sin(angle_ellipse_f)*
+                                                             np.cos(angle_ellipse_r) - 
+                                                             np.sin(angle_ellipse_r)*
+                                                             np.cos(angle_ellipse_f)*
+                                                             np.cos(theta_f - theta_r))**2 + 
+                                                             np.sin(angle_ellipse_r)**2*
+                                                             np.sin(theta_f - theta_r)**2)],
+        'r_Q_S_z' : [(np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) - 
+                     np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
+                     np.cos(theta_f - theta_r))*np.cos(theta_f)/ \
+                        np.sqrt((np.sin(angle_ellipse_f)*
+                                 np.cos(angle_ellipse_r) - 
+                                 np.sin(angle_ellipse_r)*
+                                 np.cos(angle_ellipse_f)*
+                                 np.cos(theta_f - theta_r))**2 + 
+                                 np.sin(angle_ellipse_r)**2*
+                                 np.sin(theta_f - theta_r)**2) - \
+                                    np.sin(angle_ellipse_r)*np.sin(theta_f)* \
+                                        np.sin(theta_f - theta_r)* \
+                                            np.cos(angle_ellipse_f)/ \
+                                                np.sqrt((np.sin(angle_ellipse_f)*
+                                                         np.cos(angle_ellipse_r) - 
+                                                         np.sin(angle_ellipse_r)*
+                                                         np.cos(angle_ellipse_f)*
+                                                         np.cos(theta_f - theta_r))**2 + 
+                                                         np.sin(angle_ellipse_r)**2*
+                                                         np.sin(theta_f - theta_r)**2)]
+
     }
 
-    bike_params['r'] = 2*br
-
-    # print(f'Max wheel radius = {bike_params['r']}')
+    # Set wheel radii
+    bike_params['rf'] = af
+    bike_params['rr'] = ar
 
     results_sf, state_sf = fit_img2model(imgdata, x0, bike_params, boundaries)
-    print(f'phi = {np.rad2deg(state_sf[-1][0])}')
-    print(f'theta = {np.rad2deg(state_sf[-1][1])}')
-    print(f'psi = {np.rad2deg(state_sf[-1][2])}')
-    print(f'delta = {np.rad2deg(state_sf[-1][3])}')
-    print(f'x = {state_sf[-1][4]}')
-    print(f'y = {state_sf[-1][5]}')
-    print(f'z = {state_sf[-1][6]}')
+    print(f'phi = {np.rad2deg(state_sf[-1][0]):.2f}')
+    print(f'theta = {np.rad2deg(state_sf[-1][1]):.2f}')
+    print(f'psi = {np.rad2deg(state_sf[-1][2]):.2f}')
+    print(f'delta = {np.rad2deg(state_sf[-1][3]):.2f}')
+    print(f'x = {state_sf[-1][4]:.2f}')
+    print(f'y = {state_sf[-1][5]:.2f}')
+    print(f'z = {state_sf[-1][6]:.2f}')
 
-    state_sf[-1][4] = state_sf[-1][4] + assumed_origin[0]
-    state_sf[-1][6] = state_sf[-1][6] + assumed_origin[1]
 
     if args.plot == 'e':
         
@@ -254,12 +362,13 @@ if args.single_frame != '0':
         plt.grid()
         plt.show()
 
-        plot_mbd_model_3d(bike_params, state_sf[-1])
+        plot_mbd_model_3d(bike_params, state_sf[-1], 'solver')
+        plot_mbd_model_3d(bike_params, x0, 'initial_guess')
+        plt.show()
 
 elif args.data != '0':
 
     # ----- Data processing -----
-
     if args.data == 'cut':
         data_directory = DATA_CUT
     elif args.data == '1-1':
@@ -277,9 +386,10 @@ elif args.data != '0':
     data_model, rear_wheel, front_wheel = data4model(tracking_data, assumed_origin)
     first_frame = tracking_data['first_frame']
     
-    bike_params['r'] = 2*max(rear_wheel[:, 3])
+    bike_params['rr'] = max(rear_wheel[:, 2])
+    bike_params['rf'] = max(front_wheel[:, 2])
 
-    results_history = fit_img2model(data_model, x0, bike_params, boundaries)
+    results_history, x0_history = fit_img2model(data_model, x0, bike_params, boundaries)
 
     roll_history = []
     pitch_history = []
@@ -305,12 +415,23 @@ elif args.data != '0':
     front_wheel_fit_x = x_history + data_model['r_Cf_Cr_x']
     front_wheel_fit_z = z_history + data_model['r_Cf_Cr_z']
 
+    # ----- Test print -----
+    print('This is printing the results for frame 396')
+    print(f'roll:{np.rad2deg(roll_history[7]):.2f}')
+    print(f'pitch:{np.rad2deg(pitch_history[7]):.2f}')
+    print(f'yaw:{np.rad2deg(yaw_history[7]):.2f}')
+    print(f'steer:{np.rad2deg(steer_history[7]):.2f}')
+
     end_time = time.time()
     print(f'Execution time: {end_time - start_time}')
 
+    if args.save_csv:
+        df = pd.DataFrame(data_sim)
+        df.to_csv('datacsv_bg.csv')
+
     # ----- Store processed data -----
-    with open('/home/eimolgon/Documents/PhD-Project/vid2dyn/output/data4model_try1.json', 'w') as f:
-        json.dump(data_model, f)
+    # with open('/home/eimolgon/Documents/PhD-Project/vid2dyn/output/data4model_try1.json', 'w') as f:
+    #     json.dump(data_model, f)
 
     # ----- Plotting -----
     if args.animate_points == 'data':

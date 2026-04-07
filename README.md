@@ -38,8 +38,11 @@ To-Do
     - [ ] Improve argparse plot: -p all, -p yaw, -p roll, etc.
     - [ ] Add -t for tests -t model -t ellipse, etc.
 - [ ] Fix filtered data processing
-- [ ] Check ellipse animation https://stackoverflow.com/questions/78113285/time-control-bar-for-animation-in-matplotlib
-- [ ] Check ellipse reconstruction
+- [x] Check ellipse animation https://stackoverflow.com/questions/78113285/time-control-bar-for-animation-in-matplotlib
+- [x] Check ellipse reconstruction
+- [ ] Use previous frames to estimate next state
+- [ ] Add dashed line plot in 3d to show initial guess
+- [ ] Add constraint for wheel size
 
 
 

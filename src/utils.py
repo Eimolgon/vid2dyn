@@ -196,7 +196,50 @@ def fitEllipse(points, resolution):
     return xc, yc, axis_1, axis_2, theta
 
 
-def find_points(ellipse):
+def fitEllipse_conic(points, resolution):
+    """
+    Fits an ellipse to normalized points and rescales it to screen resolution.
+    
+    Args:
+        points: (N, 2) array of normalized (x, y) coordinates.
+        resolution: (sx, sy) tuple representing the scale factors (e.g., screen width/height).
+        
+    Returns:
+        x, y: Center coordinates in scaled space.
+        a, b: Semi-major and semi-minor axes in scaled space.
+        theta: Rotation angle in radians (standardized range).
+    """
+    sx, sy = resolution
+    xn = points[:, 0]
+    yn = points[:, 1]
+
+    # 1. Fit in normalized space
+    D = np.stack([xn**2, xn*yn, yn**2, xn, yn, np.ones_like(xn)], axis=1)
+    S = D.T @ D
+    C = np.zeros((6, 6))
+    C[0, 2], C[2, 0], C[1, 1] = 2, 2, -1
+    
+    try:
+        evals, evecs = np.linalg.eig(np.linalg.inv(S) @ C)
+        coeffs = evecs[:, np.argmax(evals)]
+    except:
+        return None
+
+    # 2. Map to screen: x = sx*xn, y = sy*(1 - yn)
+    a_n, b_n, c_n, d_n, e_n, f_n = coeffs
+    
+    # Transformation algebra
+    a = a_n / (sx**2)
+    b = -b_n / (sx * sy) 
+    c = c_n / (sy**2)
+    d = (b_n + d_n) / sx
+    e = -(2 * c_n + e_n) / sy
+    f = c_n + e_n + f_n
+
+    return a, b, c, d, e, f
+
+
+def find_points(ellipse, direction):
     '''
     Find extreme points of the ellipse.
     Input: ellipse parameters.
@@ -241,10 +284,24 @@ def find_points(ellipse):
     p2_z = z - ((a**2 - b**2)*np.sin(theta)*np.cos(theta))/d_x
     p4_z = z + ((a**2 - b**2)*np.sin(theta)*np.cos(theta))/d_x
 
+
+    # I just flip points 2 and 4 because those are the two that are 'in front'
+    # and 'behind' of the wheels and will change depending on the direction
+    # of travel.
+    if direction == 'right':
+        p2 = (p2_x, p2_z)
+        p4 = (p4_x, p4_z)
+        p2_2 = (x + k*w_x, z + k*w_y)
+        p4_2 = (x - k*w_x, z - k*w_y)
+    elif direction == 'left':
+        p4 = (p2_x, p2_z)
+        p2 = (p4_x, p4_z)
+        p4_2 = (x + k*w_x, z + k*w_y)
+        p2_2 = (x - k*w_x, z - k*w_y)
+
     p1 = (p1_x, p1_z)
-    p2 = (p2_x, p2_z)
     p3 = (p3_x, p3_z)
-    p4 = (p4_x, p4_z)
+    
 
     return p1, p2, p3, p4, p2_2, p4_2
 
@@ -518,6 +575,8 @@ def data4model(track_data, assumed_origin):
         'r_P1f_Cf_z':0,
         'r_P3f_Cf_x':0,
         'r_P3f_Cf_z':0,
+        'r_Q_S_x':0,
+        'r_Q_S_z':0
     }
 
     rear_wheel = {
@@ -532,18 +591,35 @@ def data4model(track_data, assumed_origin):
     ellipse_r = np.array(track_data[1]['ellipses'])
     extremes_r = np.array(track_data[1]['extremes'])
 
+    p1_f = extremes_f[:, 0]
+    p3_f = extremes_f[:, 2]
+
     xf = np.array(ellipse_f[:,0])
     zf = np.array(ellipse_f[:,1])
+    af = np.array(ellipse_f[:,2])
+    bf = np.array(ellipse_f[:,3])
+    theta_f = np.array(ellipse_f[:,4])
     
-    upper_f = extremes_f[:, 0]
-    bottom_f = extremes_f[:, 1]
 
+    p1_r = extremes_r[:, 0]
+    p3_r = extremes_r[:, 2]
 
     xr = np.array(ellipse_r[:,0])
     zr = np.array(ellipse_r[:,1])
+    ar = np.array(ellipse_r[:,2]) 
+    br = np.array(ellipse_r[:,3])
+    theta_r = np.array(ellipse_r[:,4])
     
-    upper_r = extremes_r[:, 0]
-    bottom_r = extremes_r[:, 1]
+    
+    angle_ellipse_f = np.array([
+        np.arccos(b / a) if a > b else 0
+        for a, b in zip(af, bf)
+    ])
+
+    angle_ellipse_r = np.array([
+        np.arccos(b / a) if a > b else 0
+        for a, b in zip(ar, br)
+    ])
 
 
     rear_wheel['x'] = xr
@@ -551,18 +627,55 @@ def data4model(track_data, assumed_origin):
 
     data['r_Cf_Cr_x'] = xf - xr
     data['r_Cf_Cr_z'] = zf - zr
-    data['r_Cr_O_x'] = xr - assumed_origin[0]
-    data['r_Cr_O_z'] = zr - assumed_origin[1]
-    # data['r_P_S_x'] = (np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))*np.sin(theta_f)/np.sqrt((np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))**2 + np.sin(q1_r)**2*np.sin(theta_f - theta_r)**2) + np.sin(q1_r)*np.sin(theta_f - theta_r)*np.cos(q1_f)*np.cos(theta_f)/np.sqrt((np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))**2 + np.sin(q1_r)**2*np.sin(theta_f - theta_r)**2)
-    # data['r_P_S_z'] = (np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))*np.cos(theta_f)/np.sqrt((np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))**2 + np.sin(q1_r)**2*np.sin(theta_f - theta_r)**2) - np.sin(q1_r)*np.sin(theta_f)*np.sin(theta_f - theta_r)*np.cos(q1_f)/np.sqrt((np.sin(q1_f)*np.cos(q1_r) - np.sin(q1_r)*np.cos(q1_f)*np.cos(theta_f - theta_r))**2 + np.sin(q1_r)**2*np.sin(theta_f - theta_r)**2)
-    data['r_P1f_Cf_x'] = upper_r[:, 0] - xr
-    data['r_P1f_Cf_z'] = upper_r[:, 1] - zr
-    data['r_P3f_Cf_x'] = bottom_r[:, 0] - xr
-    data['r_P3f_Cf_z'] = bottom_r[:, 1] - zr
-    data['r_P1r_Cr_x'] = upper_f[:, 0] - xf
-    data['r_P1r_Cr_z'] = upper_f[:, 1] - zf
-    data['r_P3r_Cr_x'] = bottom_f[:, 0] - xf
-    data['r_P3r_Cr_z'] = bottom_f[:, 1] - zf
+    data['r_Cr_O_x'] = xr
+    data['r_Cr_O_z'] = zr
+    data['r_P1f_Cf_x'] = p1_r[:, 0] - xr
+    data['r_P1f_Cf_z'] = p1_r[:, 1] - zr
+    data['r_P3f_Cf_x'] = p3_r[:, 0] - xr
+    data['r_P3f_Cf_z'] = p3_r[:, 1] - zr
+    data['r_P1r_Cr_x'] = p1_f[:, 0] - xf
+    data['r_P1r_Cr_z'] = p1_f[:, 1] - zf
+    data['r_P3r_Cr_x'] = p3_f[:, 0] - xf
+    data['r_P3r_Cr_z'] = p3_f[:, 1] - zf
+    data['r_Q_S_x'] = (np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) - 
+                     np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
+                     np.cos(theta_f - theta_r))*np.sin(theta_f)/ \
+                        np.sqrt((np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) 
+                                 - np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
+                                 np.cos(theta_f - theta_r))**2 + 
+                                 np.sin(angle_ellipse_r)**2*
+                                 np.sin(theta_f - theta_r)**2) + \
+                                    np.sin(angle_ellipse_r)*\
+                                        np.sin(theta_f - theta_r)*\
+                                            np.cos(angle_ellipse_f)*\
+                                                np.cos(theta_f)/ \
+                                                    np.sqrt((np.sin(angle_ellipse_f)*
+                                                             np.cos(angle_ellipse_r) - 
+                                                             np.sin(angle_ellipse_r)*
+                                                             np.cos(angle_ellipse_f)*
+                                                             np.cos(theta_f - theta_r))**2 + 
+                                                             np.sin(angle_ellipse_r)**2*
+                                                             np.sin(theta_f - theta_r)**2)    
+    data['r_Q_S_z'] = (np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) - 
+                     np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
+                     np.cos(theta_f - theta_r))*np.cos(theta_f)/ \
+                        np.sqrt((np.sin(angle_ellipse_f)*
+                                 np.cos(angle_ellipse_r) - 
+                                 np.sin(angle_ellipse_r)*
+                                 np.cos(angle_ellipse_f)*
+                                 np.cos(theta_f - theta_r))**2 + 
+                                 np.sin(angle_ellipse_r)**2*
+                                 np.sin(theta_f - theta_r)**2) - \
+                                    np.sin(angle_ellipse_r)*np.sin(theta_f)* \
+                                        np.sin(theta_f - theta_r)* \
+                                            np.cos(angle_ellipse_f)/ \
+                                                np.sqrt((np.sin(angle_ellipse_f)*
+                                                         np.cos(angle_ellipse_r) - 
+                                                         np.sin(angle_ellipse_r)*
+                                                         np.cos(angle_ellipse_f)*
+                                                         np.cos(theta_f - theta_r))**2 + 
+                                                         np.sin(angle_ellipse_r)**2*
+                                                         np.sin(theta_f - theta_r)**2)
 
     data_json = clean4json(data)
     rw_json = clean4json(rear_wheel)
@@ -595,7 +708,9 @@ def fit_img2model(real_data, initial_guess, bike_parameters, boundaries):
     'r_P1f_Cf_x': 0,
     'r_P1f_Cf_z': 0,
     'r_P3f_Cf_x': 0,
-    'r_P3f_Cf_z': 0
+    'r_P3f_Cf_z': 0,
+    'r_Q_S_x': 0,
+    'r_Q_S_z': 0
     }
 
     for i in range(len(real_data['r_Cf_Cr_x'])):
@@ -612,6 +727,8 @@ def fit_img2model(real_data, initial_guess, bike_parameters, boundaries):
         image_data['r_P1f_Cf_z'] = real_data['r_P1f_Cf_z'][i]
         image_data['r_P3f_Cf_x'] = real_data['r_P3f_Cf_x'][i]
         image_data['r_P3f_Cf_z'] = real_data['r_P3f_Cf_z'][i]
+        image_data['r_Q_S_x'] = real_data['r_Q_S_x'][i]
+        image_data['r_Q_S_z'] = real_data['r_Q_S_z'][i]
 
         results_iteration = least_squares(residual_eqs, x0, 
                                             args = (image_data, bike_parameters), 
@@ -634,7 +751,7 @@ def points2plot(bike_parameters:dict, state):
 
     subs = (state[0], state[1], state[2], state[3], state[4], state[5], 
             state[6], bike_parameters['lr'], bike_parameters['lf1'],
-            bike_parameters['lf2'], bike_parameters['r'])
+            bike_parameters['lf2'], bike_parameters['rr'], bike_parameters['rf'])
     
     
     Cr_point = (eval_f03(*subs), eval_p01(*subs), eval_f04(*subs))
@@ -686,6 +803,29 @@ def pt2circle(p1, p2, p3, p4):
     return cx, cy, cz
 
 
+def set_axes_equal(ax):
+    '''
+    Used to plot equal axes in the 3d view.
+    '''
+    x_limits = ax.get_xlim3d()
+    y_limits = ax.get_ylim3d()
+    z_limits = ax.get_zlim3d()
+
+    x_range = abs(x_limits[1] - x_limits[0])
+    y_range = abs(y_limits[1] - y_limits[0])
+    z_range = abs(z_limits[1] - z_limits[0])
+
+    x_middle = sum(x_limits) / 2
+    y_middle = sum(y_limits) / 2
+    z_middle = sum(z_limits) / 2
+
+    plot_radius = 0.5 * max([x_range, y_range, z_range])
+
+    ax.set_xlim3d([x_middle - plot_radius, x_middle + plot_radius])
+    ax.set_ylim3d([y_middle - plot_radius, y_middle + plot_radius])
+    ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
+
+
 def plot_mbd_model_2d(ax, bike_parameters:dict, state, source):
     '''
     Create 2-dimensional plot of the model at the given state.
@@ -728,15 +868,23 @@ def plot_mbd_model_2d(ax, bike_parameters:dict, state, source):
     ax.scatter(p3f_point[0], p3f_point[2], facecolors='none', edgecolors='C8', s=50)
 
     ax.grid()
+    ax.axis('equal')
 
     return
 
-def plot_mbd_model_3d(bike_parameters:dict, state):
+
+def plot_mbd_model_3d(bike_parameters:dict, state, source):
     '''
     Create 3-dimensional plot of the model at the given state.
     Input: state-space vector.
     Output: plot of the model.
     '''
+
+    if source == 'initial_guess':
+        line_type = 'dashed'
+    elif source == 'solver':
+        line_type = 'solid'
+    
 
     frame_points, rw_points, fw_points, r_pts_2, f_pts_2 = points2plot(bike_parameters, state)
     Cr_point, S_point, Q_point, Cf_point = frame_points
@@ -754,15 +902,18 @@ def plot_mbd_model_3d(bike_parameters:dict, state):
 
     ax.plot([Cr_point[0], S_point[0]],
             [Cr_point[1], S_point[1]],
-            [Cr_point[2], S_point[2]], marker='o', color='C0', label='Frame')
+            [Cr_point[2], S_point[2]], marker='o', color='C0', label='Frame',
+            linestyle=line_type)
 
     ax.plot([S_point[0], Q_point[0]],
             [S_point[1], Q_point[1]],
-            [S_point[2], Q_point[2]], marker='o', color='C2', label='Steering')
+            [S_point[2], Q_point[2]], marker='o', color='C2', label='Steering',
+            linestyle=line_type)
     
     ax.plot([Q_point[0], Cf_point[0]],
             [Q_point[1], Cf_point[1]],
-            [Q_point[2], Cf_point[2]], marker='o', color='C1', label='Fork')
+            [Q_point[2], Cf_point[2]], marker='o', color='C1', label='Fork',
+            linestyle=line_type)
     
     ax.scatter(p1r_point[0], p1r_point[1], p1r_point[2], marker='x', color='red')
     ax.scatter(p3r_point[0], p3r_point[1], p3r_point[2], marker='x', color='black')
@@ -770,15 +921,18 @@ def plot_mbd_model_3d(bike_parameters:dict, state):
     ax.scatter(p1f_point[0], p1f_point[1], p1f_point[2], marker='^', color='red')
     ax.scatter(p3f_point[0], p3f_point[1], p3f_point[2], marker='^', color='black')
     
-    ax.plot(cx_r, cy_r, cz_r, color='black', linestyle='-')
-    ax.plot(cx_f, cy_f, cz_f, color='black', linestyle='-')
+    ax.plot(cx_r, cy_r, cz_r, color='black', linestyle=line_type)
+    ax.plot(cx_f, cy_f, cz_f, color='black', linestyle=line_type)
 
     ax.set_xlabel('X axis')
     ax.set_ylabel('Y axis')
     ax.set_zlabel('Z axis')
-    plt.show()
+    ax.set_box_aspect([1, 1, 1])
+    set_axes_equal(ax)
+    # plt.show()
 
     return
+
 
 def plot_raw_data(ax, raw_data, screen_resolution, plot_color):
     '''
@@ -790,6 +944,7 @@ def plot_raw_data(ax, raw_data, screen_resolution, plot_color):
     ax.grid()
 
     return
+
 
 def plot_dots(ax, dots, wheel):
     '''
@@ -807,3 +962,54 @@ def plot_dots(ax, dots, wheel):
     ax.grid()
 
     return
+
+
+# ----- This is made by copilot so needs checking -----
+
+def get_normal(a, b, c, d, e, f):
+    # extract quadratic form
+    Q = np.array([[a, b/2],
+                  [b/2, c]])
+
+    
+    if np.linalg.det(Q) < 0:
+        Q = -Q
+
+    vals, vecs = np.linalg.eigh(Q)
+
+    eps = 1e-12
+    vals = np.maximum(vals, eps)
+
+    # semi-axes ratios (scale irrelevant)
+    alpha = 1.0 / np.sqrt(vals[1])
+    beta  = 1.0 / np.sqrt(vals[0])
+
+    # major axis direction
+    v = vecs[:, 1]
+    theta = np.arctan2(v[1], v[0])
+
+    u1 = np.array([
+        np.cos(theta) / alpha,
+        np.sin(theta) / alpha,
+        1.0
+    ])
+
+    u2 = np.array([
+        -np.sin(theta) / beta,
+         np.cos(theta) / beta,
+         1.0
+    ])
+
+    n = np.cross(u1, u2)
+    n /= np.linalg.norm(n)
+
+    # Optional: enforce positive Z
+    if n[2] < 0:
+        n = -n
+
+    normal = n
+
+    return normal
+
+# ----- ------ ----- ----- -----
+

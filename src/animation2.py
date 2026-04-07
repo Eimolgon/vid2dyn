@@ -236,7 +236,8 @@ def animate_3d_bicycle(time, x_v, y_v, z_v, q3_v, q4_v, q5_v, q6_v, q7_v, q8_v,
     return ani
 
 
-df = pd.read_csv('/home/eimolgon/Documents/PhD-Project/02-video-data/260312-datacsv_bg-oslo.csv')
+# df = pd.read_csv('/home/eimolgon/Documents/PhD-Project/02-video-data/260312-datacsv_bg-oslo.csv')
+df = pd.read_csv('/home/eimolgon/Documents/PhD-Project/vid2dyn/datacsv_bg.csv')
 bpar = benchmark_parameters()
 # 'phi', 'theta', 'psi', 'delta', 'xr', 'yr', 'zr']
 ani = animate_3d_bicycle(
