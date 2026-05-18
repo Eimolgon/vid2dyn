@@ -3,9 +3,15 @@ import numpy as np
 import sympy.physics.mechanics as me
 
 def residual_eqs(x, data, bike_params, camera_params):
-    subs = (x[0], x[1], x[2], x[3], x[4], x[5], x[6], bike_params['lr'],
-            bike_params['lf1'], bike_params['lf2'], bike_params['rr'], 
-            bike_params['rf'])
+    subs = (x[0], x[1], x[2], x[3], x[4], x[5], x[6], 
+            bike_params['lr'], 
+            bike_params['lf1'], 
+            bike_params['lf2'], 
+            bike_params['rr'], 
+            bike_params['rf'], 
+            camera_params['f'], 
+            camera_params['cx'],
+            camera_params['cy'])
 
     f01 = eval_f01(*subs) - data['r_Cf_Cr_x']
     f02 = eval_f02(*subs) - data['r_Cf_Cr_z']
@@ -31,14 +37,14 @@ def perspective_projection(point, origin, frame, fx, cx, cy, fy=0):
     if fy == 0: 
         fy = fx
 
-    r = point.pos_form(origin)
+    r = point.pos_from(origin)
 
     x = r.dot(frame.x)
     y = r.dot(frame.y)
     z = r.dot(frame.z)
     
-    u = fx * (x / y) + cx
-    v = fy * (z / y) + cy
+    u = fx * (x / y)# + cx
+    v = fy * (z / y)# + cy
 
     return u, v
 
@@ -50,7 +56,7 @@ x_r, y_r, z_r = sp.symbols('x_r, y_r, z_r')
 rr, rf = sp.symbols('rr, rf')
 f, cx, cy = sp.symbols('f, cx, cy') # Camera intrinsics
 
-variables = (phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, rr, rf)
+variables = (phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, rr, rf, f, cx, cy)
 
 N, R, F = sp.symbols('N, R, F', cls=me.ReferenceFrame)
 
@@ -96,59 +102,46 @@ P4f.set_pos(Cf, rf*me.cross(F.y, me.cross(F.y, -N.x)))
 
 # Projections into the screen plane
 
-r_Cf_Cr_x = Cf.pos_from(Cr).dot(N.x)
-r_Cf_Cr_y = Cf.pos_from(Cr).dot(N.y)
-r_Cf_Cr_z = Cf.pos_from(Cr).dot(N.z)
+u_Cf_Cr, v_Cf_Cr = perspective_projection(Cf, Cr, N, f, cx, cy)
 
-r_Cr_O_x = Cr.pos_from(O).dot(N.x)
-r_Cr_O_y = Cr.pos_from(O).dot(N.y)
-r_Cr_O_z = Cr.pos_from(O).dot(N.z)
+u_Cf_O, v_Cf_O = perspective_projection(Cf, O, N, f, cx, cy)
+
+u_P1r_Cr, v_P1r_Cr = perspective_projection(P1r, Cr, N, f, cx, cy)
+u_P3r_Cr, v_P3r_Cr = perspective_projection(P3r, Cr, N, f, cx, cy)
+
+u_P1f_Cf, v_P1f_Cf = perspective_projection(P1f, Cf, N, f, cx, cy)
+u_P3f_Cf, v_P3f_Cf = perspective_projection(P3f, Cf, N, f, cx, cy)
 
 r_Q_S_x = R.y.cross(F.y).dot(N.x)
 r_Q_S_y = R.y.cross(F.y).dot(N.y)
 r_Q_S_z = R.y.cross(F.y).dot(N.z)
 
-r_P1r_Cr_x = P1r.pos_from(Cr).dot(N.x)
-r_P1r_Cr_y = P1r.pos_from(Cr).dot(N.y)
-r_P1r_Cr_z = P1r.pos_from(Cr).dot(N.z)
-
-r_P3r_Cr_x = P3r.pos_from(Cr).dot(N.x)
-r_P3r_Cr_y = P3r.pos_from(Cr).dot(N.y)
-r_P3r_Cr_z = P3r.pos_from(Cr).dot(N.z)
-
-r_P1f_Cf_x = P1f.pos_from(Cf).dot(N.x)
-r_P1f_Cf_y = P1f.pos_from(Cf).dot(N.y)
-r_P1f_Cf_z = P1f.pos_from(Cf).dot(N.z)
-
-r_P3f_Cf_x = P3f.pos_from(Cf).dot(N.x)
-r_P3f_Cf_y = P3f.pos_from(Cf).dot(N.y)
-r_P3f_Cf_z = P3f.pos_from(Cf).dot(N.z)
-
+u_Q_S = f * (r_Q_S_x / r_Q_S_y) + cx
+v_Q_S = f * (r_Q_S_z / r_Q_S_y) + cy
 
 
 # Lambdify functions
 
-eval_f01 = sp.lambdify(variables, r_Cf_Cr_x)
-eval_f02 = sp.lambdify(variables, r_Cf_Cr_z)
-eval_f03 = sp.lambdify(variables, r_Cr_O_x)
-eval_f04 = sp.lambdify(variables, r_Cr_O_z)
-eval_f05 = sp.lambdify(variables, r_P1r_Cr_x)
-eval_f06 = sp.lambdify(variables, r_P1r_Cr_z)
-eval_f07 = sp.lambdify(variables, r_P3r_Cr_x)
-eval_f08 = sp.lambdify(variables, r_P3r_Cr_z)
-eval_f09 = sp.lambdify(variables, r_P1f_Cf_x)
-eval_f10 = sp.lambdify(variables, r_P1f_Cf_z)
-eval_f11 = sp.lambdify(variables, r_P3f_Cf_x)
-eval_f12 = sp.lambdify(variables, r_P3f_Cf_z)
-eval_f13 = sp.lambdify(variables, r_Q_S_x)
-eval_f14 = sp.lambdify(variables, r_Q_S_z)
-eval_f15 = sp.lambdify(variables, r_Cf_Cr_y)
-eval_f16 = sp.lambdify(variables, r_Cr_O_y)
-eval_f17 = sp.lambdify(variables, r_Q_S_y)
-eval_f18 = sp.lambdify(variables, r_P1r_Cr_y)
-eval_f19 = sp.lambdify(variables, r_P3r_Cr_y)
-eval_f20 = sp.lambdify(variables, r_P1f_Cf_y)
-eval_f21 = sp.lambdify(variables, r_P3f_Cf_y)
+eval_f01 = sp.lambdify(variables, u_Cf_Cr)
+eval_f02 = sp.lambdify(variables, v_Cf_Cr)
+
+eval_f03 = sp.lambdify(variables, u_Cf_O)
+eval_f04 = sp.lambdify(variables, v_Cf_O)
+
+eval_f05 = sp.lambdify(variables, u_P1r_Cr)
+eval_f06 = sp.lambdify(variables, v_P1r_Cr)
+
+eval_f07 = sp.lambdify(variables, u_P3r_Cr)
+eval_f08 = sp.lambdify(variables, v_P3r_Cr)
+
+eval_f09 = sp.lambdify(variables, u_P1f_Cf)
+eval_f10 = sp.lambdify(variables, v_P1f_Cf)
+
+eval_f11 = sp.lambdify(variables, u_P3f_Cf)
+eval_f12 = sp.lambdify(variables, v_P3f_Cf)
+
+eval_f13 = sp.lambdify(variables, u_Q_S)
+eval_f14 = sp.lambdify(variables, v_Q_S)
 
 
 # ----- Segments for plotting -----

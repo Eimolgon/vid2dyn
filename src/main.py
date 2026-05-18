@@ -5,10 +5,13 @@ import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import bike_model as ortpro
+import model_perspective as perpro
 from matplotlib.patches import Ellipse
 from scipy.optimize import least_squares
-from bike_model import *
+# from bike_model import *
 from skimage.draw import ellipse_perimeter
+
 
 from utils import (
     readFile,
@@ -96,6 +99,9 @@ lower_bound = [-np.pi/2, -np.pi/2, -np.pi/2, -np.pi/2, 0, -np.inf, 0]
 upper_bound = [np.pi/2, np.pi/2, np.pi/2, np.pi/2, 1920, np.inf, 1080]
 boundaries = (lower_bound, upper_bound)
 
+camera_params = {'f': 24,
+                 'cx': screen_resolution[0]*0.5, 
+                 'cy': screen_resolution[1]*0.5}
 
 # === Initial guess ===
 
@@ -141,7 +147,7 @@ if args.single_frame < 400 :
         np.deg2rad(-45),
         np.deg2rad(15),
         400,
-        0,
+        100,
         600
     ])
 elif args.single_frame < 470 :
@@ -151,7 +157,7 @@ elif args.single_frame < 470 :
         np.deg2rad(0),
         np.deg2rad(0),
         180,
-        0,
+        100,
         400
     ])
 else:
@@ -161,7 +167,7 @@ else:
         np.deg2rad(75),
         np.deg2rad(15),
         1300,
-        0,
+        100,
         650
     ])
 
@@ -169,7 +175,8 @@ else:
 
 if args.single_frame != 0 :
 
-    test_frame_single = f'/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000{args.single_frame}.txt'
+    framenum = args.single_frame
+    test_frame_single = f'/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000{framenum}.txt'
 
     # Process raw data
     data_points = readFile(test_frame_single)
@@ -203,23 +210,23 @@ if args.single_frame != 0 :
         angle_ellipse_r = 0
 
     # ----- This is just another test ----- 
-    aff,bff,cff,dff,eff,fff = fitEllipse_conic(front_data, screen_resolution)
-    normal_f = get_normal(aff,bff,cff,dff,eff,fff)
+    # aff,bff,cff,dff,eff,fff = fitEllipse_conic(front_data, screen_resolution)
+    # normal_f = get_normal(aff,bff,cff,dff,eff,fff)
 
-    arr, brr, crr, drr, err, frr = fitEllipse_conic(rear_data, screen_resolution)
-    normal_r = get_normal(arr, brr, crr, drr, err, frr)
+    # arr, brr, crr, drr, err, frr = fitEllipse_conic(rear_data, screen_resolution)
+    # normal_r = get_normal(arr, brr, crr, drr, err, frr)
 
-    print(f'normal front: {normal_f}')
-    new_angle2camera_f = normal_f/np.linalg.norm(normal_f)
+    # print(f'normal front: {normal_f}')
+    # new_angle2camera_f = normal_f/np.linalg.norm(normal_f)
 
-    print(f'normal rear: {normal_r}')
-    new_angle2camera_r = normal_r/np.linalg.norm(normal_r)
+    # print(f'normal rear: {normal_r}')
+    # new_angle2camera_r = normal_r/np.linalg.norm(normal_r)
     
-    print(f'old angle f: {np.rad2deg(angle_ellipse_f):.2f}')
-    print(f'new angle f: {np.rad2deg(new_angle2camera_f[1]):.2f}')
+    # print(f'old angle f: {np.rad2deg(angle_ellipse_f):.2f}')
+    # print(f'new angle f: {np.rad2deg(new_angle2camera_f[1]):.2f}')
 
-    print(f'old angle r: {np.rad2deg(angle_ellipse_r):.2f}')
-    print(f'new angle r: {np.rad2deg(new_angle2camera_r[1]):.2f}')
+    # print(f'old angle r: {np.rad2deg(angle_ellipse_r):.2f}')
+    # print(f'new angle r: {np.rad2deg(new_angle2camera_r[1]):.2f}')
 
     # ----- ----- ----- ----- -----
 
@@ -244,9 +251,9 @@ if args.single_frame != 0 :
         'r_P1f_Cf_z' : [p1_f[1] - zf],
         'r_P3f_Cf_x' : [p3_f[0] - xf],
         'r_P3f_Cf_z' : [p3_f[1] - zf],
-        'r_Q_S_x' : [(np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) - 
-                     np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
-                     np.cos(theta_f - theta_r))*np.sin(theta_f)/ \
+        'r_Q_S_x' : [(np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) 
+                     - np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)
+                     * np.cos(theta_f - theta_r))*np.sin(theta_f)/ \
                         np.sqrt((np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) 
                                  - np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
                                  np.cos(theta_f - theta_r))**2 + 
@@ -287,10 +294,10 @@ if args.single_frame != 0 :
     }
 
     # Set wheel radii
-    bike_params['rf'] = af
-    bike_params['rr'] = ar
+    # bike_params['rf'] = af
+    # bike_params['rr'] = ar    
 
-    results_sf, state_sf = fit_img2model(imgdata, x0, bike_params, boundaries)
+    results_sf, state_sf = fit_img2model(imgdata, x0, bike_params, boundaries, camera_params, perpro)
     print(f'phi = {np.rad2deg(state_sf[-1][0]):.2f}')
     print(f'theta = {np.rad2deg(state_sf[-1][1]):.2f}')
     print(f'psi = {np.rad2deg(state_sf[-1][2]):.2f}')

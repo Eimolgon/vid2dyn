@@ -683,7 +683,7 @@ def data4model(track_data, assumed_origin):
     return data_json, ellipse_r, ellipse_f
 
 
-def fit_img2model(real_data, initial_guess, bike_parameters, boundaries):
+def fit_img2model(real_data, initial_guess, bike_parameters, boundaries, camera_parameters, model):
     '''
     Least_squares fitting from image data to multibody model.
     Input: real_data, initial guess, bicycle parameters, and boundaries for the
@@ -730,8 +730,8 @@ def fit_img2model(real_data, initial_guess, bike_parameters, boundaries):
         image_data['r_Q_S_x'] = real_data['r_Q_S_x'][i]
         image_data['r_Q_S_z'] = real_data['r_Q_S_z'][i]
 
-        results_iteration = least_squares(residual_eqs, x0, 
-                                            args = (image_data, bike_parameters), 
+        results_iteration = least_squares(model.residual_eqs, x0, 
+                                            args = (image_data, bike_parameters, camera_parameters), 
                                             bounds = (lower_bound, upper_bound))
         results_history.append(results_iteration)
         x0_history.append(results_iteration['x'])
