@@ -30,12 +30,10 @@ def residual_eqs(x, data, bike_params, camera_params):
 
     return np.array([f01, f02, f03, f04, f05, f06, f07, f08, f09, f10, f11, f12, f13, f14])
 
-def perspective_projection(point, origin, frame, fx, cx, cy, fy=0):
+def perspective_projection(point, origin, frame, f):
     '''
     Create perspective projection into camera plane.
     '''
-    if fy == 0: 
-        fy = fx
 
     r = point.pos_from(origin)
 
@@ -43,8 +41,8 @@ def perspective_projection(point, origin, frame, fx, cx, cy, fy=0):
     y = r.dot(frame.y)
     z = r.dot(frame.z)
     
-    u = fx * (x / y)# + cx
-    v = fy * (z / y)# + cy
+    u = f * (x / y)
+    v = f * (z / y)
 
     return u, v
 
@@ -102,15 +100,15 @@ P4f.set_pos(Cf, rf*me.cross(F.y, me.cross(F.y, -N.x)))
 
 # Projections into the screen plane
 
-u_Cf_Cr, v_Cf_Cr = perspective_projection(Cf, Cr, N, f, cx, cy)
+u_Cf_Cr, v_Cf_Cr = perspective_projection(Cf, Cr, N, f)
 
-u_Cf_O, v_Cf_O = perspective_projection(Cf, O, N, f, cx, cy)
+u_Cf_O, v_Cf_O = perspective_projection(Cf, O, N, f)
 
-u_P1r_Cr, v_P1r_Cr = perspective_projection(P1r, Cr, N, f, cx, cy)
-u_P3r_Cr, v_P3r_Cr = perspective_projection(P3r, Cr, N, f, cx, cy)
+u_P1r_Cr, v_P1r_Cr = perspective_projection(P1r, Cr, N, f)
+u_P3r_Cr, v_P3r_Cr = perspective_projection(P3r, Cr, N, f)
 
-u_P1f_Cf, v_P1f_Cf = perspective_projection(P1f, Cf, N, f, cx, cy)
-u_P3f_Cf, v_P3f_Cf = perspective_projection(P3f, Cf, N, f, cx, cy)
+u_P1f_Cf, v_P1f_Cf = perspective_projection(P1f, Cf, N, f)
+u_P3f_Cf, v_P3f_Cf = perspective_projection(P3f, Cf, N, f)
 
 r_Q_S_x = R.y.cross(F.y).dot(N.x)
 r_Q_S_y = R.y.cross(F.y).dot(N.y)

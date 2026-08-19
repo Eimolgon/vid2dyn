@@ -209,6 +209,7 @@ if args.single_frame != 0 :
     else: 
         angle_ellipse_r = 0
 
+
     # ----- This is just another test ----- 
     # aff,bff,cff,dff,eff,fff = fitEllipse_conic(front_data, screen_resolution)
     # normal_f = get_normal(aff,bff,cff,dff,eff,fff)
@@ -297,7 +298,7 @@ if args.single_frame != 0 :
     # bike_params['rf'] = af
     # bike_params['rr'] = ar    
 
-    results_sf, state_sf = fit_img2model(imgdata, x0, bike_params, boundaries, camera_params, perpro)
+    results_sf, state_sf = fit_img2model(imgdata, x0, bike_params, boundaries, camera_params, ortpro)
     print(f'phi = {np.rad2deg(state_sf[-1][0]):.2f}')
     print(f'theta = {np.rad2deg(state_sf[-1][1]):.2f}')
     print(f'psi = {np.rad2deg(state_sf[-1][2]):.2f}')
