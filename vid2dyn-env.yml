@@ -1,4 +1,4 @@
-name: video2dynamics
+name: vid2dyn
 channels:
   - conda-forge
 dependencies:

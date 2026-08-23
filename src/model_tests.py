@@ -50,7 +50,7 @@ r_P4f_O_z = P4f.pos_from(O).dot(N.z)
 r_Cr_O_y = Cr.pos_from(O).dot(N.y)
 
 
-variables = (phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, r)
+variables = (phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, rr, rf)
 
 eval_rear_wheel_y = sp.lambdify(variables, r_Cr_O_y)
 
@@ -125,12 +125,13 @@ subs = (np.deg2rad(-5),
         4, 
         2, 
         1, 
+        2,
         2)
 
 
 
 repl = {phi:0, theta:0, psi:0, delta:0, x_r:0, y_r:0, z_r:0, lr:4, lf1:2, 
-        lf2:1, r:1}
+        lf2:1, rr:1, rf:1}
 
 
 rear_wheel = (eval_f03(*subs), eval_rear_wheel_y(*subs), eval_f04(*subs))
