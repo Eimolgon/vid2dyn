@@ -841,7 +841,8 @@ def plot_mbd_model_2d(ax, bike_parameters:dict, state, source):
                 'p1': 'purple',
                 'p3': 'yellow'}
 
-    frame_points, rw_points, fw_points, r_pts_2, f_pts2 = points2plot(bike_parameters, state)
+    frame_points, rw_points, fw_points, r_pts_2, f_pts2 = \
+        points2plot(bike_parameters, state)
     Cr_point, S_point, Q_point, Cf_point = frame_points
     p1r_point, p3r_point = rw_points
     p1f_point, p3f_point = fw_points
@@ -873,7 +874,7 @@ def plot_mbd_model_2d(ax, bike_parameters:dict, state, source):
     return
 
 
-def plot_mbd_model_3d(bike_parameters:dict, state, source):
+def plot_mbd_model_3d(bike_parameters:dict, state, source, ax=None):
     '''
     Create 3-dimensional plot of the model at the given state.
     Input: state-space vector.
@@ -884,10 +885,18 @@ def plot_mbd_model_3d(bike_parameters:dict, state, source):
         line_type = 'dashed'
     elif source == 'solver':
         line_type = 'solid'
+
+
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
     
 
-    frame_points, rw_points, fw_points, r_pts_2, f_pts_2 = points2plot(bike_parameters, state)
+    frame_points, rw_points, fw_points, r_pts_2, f_pts_2 = \
+        points2plot(bike_parameters, state)
+    
     Cr_point, S_point, Q_point, Cf_point = frame_points
+
     p1r_point, p3r_point = rw_points
     p1f_point, p3f_point = fw_points
 
@@ -897,8 +906,7 @@ def plot_mbd_model_3d(bike_parameters:dict, state, source):
     cx_r, cy_r, cz_r = pt2circle(p1r_point, p2r_point, p3r_point, p4r_point)
     cx_f, cy_f, cz_f = pt2circle(p1f_point, p2f_point, p3f_point, p4f_point)
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    
 
     ax.plot([Cr_point[0], S_point[0]],
             [Cr_point[1], S_point[1]],
@@ -924,14 +932,14 @@ def plot_mbd_model_3d(bike_parameters:dict, state, source):
     ax.plot(cx_r, cy_r, cz_r, color='black', linestyle=line_type)
     ax.plot(cx_f, cy_f, cz_f, color='black', linestyle=line_type)
 
-    ax.set_xlabel('X axis')
-    ax.set_ylabel('Y axis')
-    ax.set_zlabel('Z axis')
-    ax.set_box_aspect([1, 1, 1])
-    set_axes_equal(ax)
+    # ax.set_xlabel('X axis')
+    # ax.set_ylabel('Y axis')
+    # ax.set_zlabel('Z axis')
+    # ax.set_box_aspect([1, 1, 1])
+    # set_axes_equal(ax)
     # plt.show()
 
-    return
+    return ax
 
 
 def plot_raw_data(ax, raw_data, screen_resolution, plot_color):

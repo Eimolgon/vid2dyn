@@ -27,7 +27,8 @@ from utils import (
     plot_mbd_model_3d,
     plot_dots,
     fitEllipse_conic,
-    get_normal
+    get_normal,
+    set_axes_equal
 )
 
 
@@ -352,8 +353,8 @@ if args.single_frame != 0 :
 
     elif args.plot == 'mbd':
 
+        # 2d plot
         fig, axs = plt.subplots()
-
 
         plot_dots(axs, plot_points_f, 'front')
         plt.scatter(front_data[:, 0]*screen_resolution[0], (1 - front_data[:, 1])*screen_resolution[1], facecolors='none', edgecolors='red', s=10)
@@ -370,8 +371,20 @@ if args.single_frame != 0 :
         plt.grid()
         plt.show()
 
-        plot_mbd_model_3d(bike_params, state_sf[-1], 'solver')
-        plot_mbd_model_3d(bike_params, x0, 'initial_guess')
+
+        # 3d plot
+        fig_3d = plt.figure()
+        ax_3d = fig_3d.add_subplot(111, projection='3d')
+
+        plot_mbd_model_3d(bike_params, state_sf[-1], 'solver', ax=ax_3d)
+        plot_mbd_model_3d(bike_params, x0, 'initial_guess', ax=ax_3d)
+
+        ax_3d.set_xlabel('x axis')
+        ax_3d.set_ylabel('y axis')
+        ax_3d.set_zlabel('z axis')
+
+        set_axes_equal(ax_3d)
+
         plt.show()
 
 elif args.data != '0':
