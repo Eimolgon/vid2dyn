@@ -3,9 +3,17 @@ import numpy as np
 import sympy.physics.mechanics as me
 
 def residual_eqs(x, data, bike_params, camera_params):
-    subs = (x[0], x[1], x[2], x[3], x[4], x[5], x[6], bike_params['lr'],
-            bike_params['lf1'], bike_params['lf2'], bike_params['rr'], 
-            bike_params['rf'])
+    subs = (x[0], x[1], x[2], x[3], x[4], x[5], x[6], 
+
+            bike_params['lr'],bike_params['lf1'], bike_params['lf2'], 
+            bike_params['rr'], bike_params['rf'], 
+
+            camera_params['fx'], camera_params['fy'],
+            camera_params['cx'], camera_params['cy'],
+            camera_params['cam_x'], camera_params['cam_y'], 
+            camera_params['cam_z'], camera_params['cam_yaw'], 
+            camera_params['cam_pitch'],camera_params['cam_roll']
+            )
 
     f01 = eval_f01(*subs) - data['r_Cf_Cr_u']
     f02 = eval_f02(*subs) - data['r_Cf_Cr_v']
@@ -22,7 +30,8 @@ def residual_eqs(x, data, bike_params, camera_params):
     f13 = eval_f13(*subs) - data['r_Q_S_u']
     f14 = eval_f14(*subs) - data['r_Q_S_v']
 
-    return np.array([f01, f02, f03, f04, f05, f06, f07, f08, f09, f10, f11, f12, f13, f14])
+    return np.array([f01, f02, f03, f04, f05, f06, f07, 
+                     f08, f09, f10, f11, f12, f13, f14])
 
 def perspective_projection(point, camera_center, camera_frame,
                            fx, fy=0, cx=0, cy=0):
@@ -51,6 +60,7 @@ def perspective_projection(point, camera_center, camera_frame,
 
     u = fx * Xc / Zc + cx
     v = fy * Yc / Zc + cy
+    # Watch out here and check for the coordinates from the original image
 
     return u, v
 
@@ -62,7 +72,7 @@ x_r, y_r, z_r = sp.symbols('x_r, y_r, z_r')
 rr, rf = sp.symbols('rr, rf')
 
 # Camera intrinsics
-f, cx, cy = sp.symbols('f, cx, cy') 
+fx, fy, cx, cy = sp.symbols('fx, fy, cx, cy') 
 
 # Camera extrinsics
 cam_x, cam_y, cam_z = sp.symbols('cam_x cam_y cam_z')
@@ -76,7 +86,7 @@ variables = (phi, theta, psi, delta,
              x_r, y_r, z_r, 
              lr, lf1, lf2, 
              rr, rf,
-             f, cx, cy,
+             fx, fy, cx, cy,
              cam_x, cam_y, cam_z,
              cam_yaw, cam_pitch, cam_roll)
 
@@ -125,24 +135,21 @@ P3f.set_pos(Cf, rf*me.cross(F.y, me.cross(F.y, N.z)))
 P4f.set_pos(Cf, rf*me.cross(F.y, me.cross(F.y, -N.x)))
 
 # Perspective projections
-u_Cr, v_Cr = perspective_projection(Cr, P, C, f)
-u_Cf, v_Cf = perspective_projection(Cf, P, C, f)
+u_Cr, v_Cr = perspective_projection(Cr, P, C, fx, fy, cx, cy)
+u_Cf, v_Cf = perspective_projection(Cf, P, C, fx, fy, cx, cy)
 
-u_S, v_S = perspective_projection(S, P, C, f)
-u_Q, v_Q = perspective_projection(Q, P, C, f)
+u_S, v_S = perspective_projection(S, P, C, fx, fy, cx, cy)
+u_Q, v_Q = perspective_projection(Q, P, C, fx, fy, cx, cy)
 
-u_P1r, v_P1r = perspective_projection(P1r, P, C, f)
-u_P3r, v_P3r = perspective_projection(P3r, P, C, f)
+u_P1r, v_P1r = perspective_projection(P1r, P, C, fx, fy, cx, cy)
+u_P3r, v_P3r = perspective_projection(P3r, P, C, fx, fy, cx, cy)
 
-u_P1f, v_P1f = perspective_projection(P1f, P, C, f)
-u_P3f, v_P3f = perspective_projection(P3f, P, C, f)
+u_P1f, v_P1f = perspective_projection(P1f, P, C, fx, fy, cx, cy)
+u_P3f, v_P3f = perspective_projection(P3f, P, C, fx, fy, cx, cy)
 
 
 r_Cf_Cr_u = u_Cf - u_Cr
 r_Cf_Cr_v = v_Cf - v_Cr
-
-# r_Cr_O_u = u_Cr - cx
-# r_Cr_O_v = v_Cr - cy
 
 r_Q_S_u = u_Q - u_S
 r_Q_S_v = v_Q - v_S

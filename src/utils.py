@@ -51,15 +51,15 @@ def fitEllipse_old(points, screen_res:tuple):
 
     ell = EllipseModel()
     ell.estimate(points)
-    x, z, a, b, theta = ell.params
+    u, v, a, b, theta = ell.params
 
-    x = x*screen_res[0]
-    z = screen_res[1]*(1-z)
+    u = u*screen_res[0]
+    v = screen_res[1]*(1-v)
     a = a*screen_res[1]
     b = b*screen_res[0]
 
 
-    ellipse_data = (x, z, a, b, theta)
+    ellipse_data = (u, v, a, b, theta)
 
     return ellipse_data
 
@@ -563,20 +563,20 @@ def data4model(track_data, assumed_origin):
     '''
 
     data = {
-        'r_Cf_Cr_x':0,
-        'r_Cf_Cr_z':0,
-        'r_Cr_O_x':0,
-        'r_Cr_O_z':0,
-        'r_P1r_Cr_x':0,
-        'r_P1r_Cr_z':0,
-        'r_P3r_Cr_x':0,
-        'r_P3r_Cr_z':0,
-        'r_P1f_Cf_x':0,
-        'r_P1f_Cf_z':0,
-        'r_P3f_Cf_x':0,
-        'r_P3f_Cf_z':0,
-        'r_Q_S_x':0,
-        'r_Q_S_z':0
+        'r_Cf_Cr_u':0,
+        'r_Cf_Cr_v':0,
+        'u_Cr':0,
+        'v_Cr':0,
+        'r_P1r_Cr_u':0,
+        'r_P1r_Cr_v':0,
+        'r_P3r_Cr_u':0,
+        'r_P3r_Cr_v':0,
+        'r_P1f_Cf_u':0,
+        'r_P1f_Cf_v':0,
+        'r_P3f_Cf_u':0,
+        'r_P3f_Cf_v':0,
+        'r_Q_S_u':0,
+        'r_Q_S_v':0
     }
 
     rear_wheel = {
@@ -625,19 +625,19 @@ def data4model(track_data, assumed_origin):
     rear_wheel['x'] = xr
     rear_wheel['z'] = zr
 
-    data['r_Cf_Cr_x'] = xf - xr
-    data['r_Cf_Cr_z'] = zf - zr
-    data['r_Cr_O_x'] = xr
-    data['r_Cr_O_z'] = zr
-    data['r_P1f_Cf_x'] = p1_r[:, 0] - xr
-    data['r_P1f_Cf_z'] = p1_r[:, 1] - zr
-    data['r_P3f_Cf_x'] = p3_r[:, 0] - xr
-    data['r_P3f_Cf_z'] = p3_r[:, 1] - zr
-    data['r_P1r_Cr_x'] = p1_f[:, 0] - xf
-    data['r_P1r_Cr_z'] = p1_f[:, 1] - zf
-    data['r_P3r_Cr_x'] = p3_f[:, 0] - xf
-    data['r_P3r_Cr_z'] = p3_f[:, 1] - zf
-    data['r_Q_S_x'] = (np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) - 
+    data['r_Cf_Cr_u'] = xf - xr
+    data['r_Cf_Cr_v'] = zf - zr
+    data['u_Cr'] = xr
+    data['v_Cr'] = zr
+    data['r_P1f_Cf_u'] = p1_r[:, 0] - xr
+    data['r_P1f_Cf_v'] = p1_r[:, 1] - zr
+    data['r_P3f_Cf_u'] = p3_r[:, 0] - xr
+    data['r_P3f_Cf_v'] = p3_r[:, 1] - zr
+    data['r_P1r_Cr_u'] = p1_f[:, 0] - xf
+    data['r_P1r_Cr_v'] = p1_f[:, 1] - zf
+    data['r_P3r_Cr_u'] = p3_f[:, 0] - xf
+    data['r_P3r_Cr_v'] = p3_f[:, 1] - zf
+    data['r_Q_S_u'] = (np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) - 
                      np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
                      np.cos(theta_f - theta_r))*np.sin(theta_f)/ \
                         np.sqrt((np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) 
@@ -656,7 +656,7 @@ def data4model(track_data, assumed_origin):
                                                              np.cos(theta_f - theta_r))**2 + 
                                                              np.sin(angle_ellipse_r)**2*
                                                              np.sin(theta_f - theta_r)**2)    
-    data['r_Q_S_z'] = (np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) - 
+    data['r_Q_S_v'] = (np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) - 
                      np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
                      np.cos(theta_f - theta_r))*np.cos(theta_f)/ \
                         np.sqrt((np.sin(angle_ellipse_f)*
@@ -683,16 +683,18 @@ def data4model(track_data, assumed_origin):
     return data_json, ellipse_r, ellipse_f
 
 
-def fit_img2model(real_data, initial_guess, bike_parameters, boundaries, camera_parameters, model):
+def fit_img2model(real_data, initial_guess, bike_parameters, 
+                  boundaries, camera_parameters, model):
     '''
     Least_squares fitting from image data to multibody model.
     Input: real_data, initial guess, bicycle parameters, and boundaries for the
     solver.
     Output: solver history.
     '''
-    x0 = initial_guess
+    x0 = np.asarray(initial_guess, dtype=float).copy()
+
     results_history = []
-    x0_history = [x0]
+    x0_history = [x0.copy()]
 
     lower_bound, upper_bound = boundaries
 
@@ -713,7 +715,7 @@ def fit_img2model(real_data, initial_guess, bike_parameters, boundaries, camera_
     'r_Q_S_v': 0
     }
 
-    for i in range(len(real_data['r_Cf_Cr_x'])):
+    for i in range(len(real_data['r_Cf_Cr_u'])):
 
         image_data['r_Cf_Cr_u'] = real_data['r_Cf_Cr_u'][i]
         image_data['r_Cf_Cr_v'] = real_data['r_Cf_Cr_v'][i]
@@ -741,11 +743,13 @@ def fit_img2model(real_data, initial_guess, bike_parameters, boundaries, camera_
                 camera_parameters
                 ), 
                 bounds = (lower_bound, upper_bound))
+        
         results_history.append(results_iteration)
-        x0_history.append(results_iteration['x'])
 
         # Update initial guess
-        x0 = results_iteration['x'].copy()
+        x0 = results_iteration.x.copy()
+
+        x0_history.append(x0.copy())
 
     return results_history, x0_history
 

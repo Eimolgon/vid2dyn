@@ -85,24 +85,63 @@ start_time = time.time()
 
 # ----- Some parameters -----
 screen_resolution = (1920, 1080)
+image_resolution = (6020, 4024)
+sensor_size = (0.0235, 0.0156)
 assumed_origin = (screen_resolution[0]*0.2, screen_resolution[1]*0.2)
 wheel_diameter = 0.6604
+focal_length = 0.028
+# bike_params = {
+#     'lr': 140,
+#     'lf1': 50,
+#     'lf2': 10,
+#     'rf': 75,
+#     'rr': 75 
+# }
+
 bike_params = {
-    'lr': 140,
-    'lf1': 50,
-    'lf2': 10,
-    'rf': 75,
-    'rr': 75 
+    'lr': 1.0,
+    'lf1': 0.5,
+    'lf2': 0.1,
+    'rf': wheel_diameter/2,
+    'rr': wheel_diameter/2 
 }
+
+
+# ----- Test values -----
+
+true_state = np.array([
+    np.deg2rad(-5.0),      # phi
+    np.deg2rad(-10.0),     # theta
+    np.deg2rad(20.0),      # psi
+    np.deg2rad(5.0),       # delta
+
+    2.0,                   # x_r [m]
+    8.0,                   # y_r [m]
+    0.0                    # z_r [m]
+])
+
 
 # ----- Solver boundaries -----
 lower_bound = [-np.pi/2, -np.pi/2, -np.pi/2, -np.pi/2, 0, -np.inf, 0]
 upper_bound = [np.pi/2, np.pi/2, np.pi/2, np.pi/2, 1920, np.inf, 1080]
 boundaries = (lower_bound, upper_bound)
 
-camera_params = {'f': 24,
-                 'cx': screen_resolution[0]*0.5, 
-                 'cy': screen_resolution[1]*0.5}
+# camera_params = {'f': 24,
+#                  'cx': screen_resolution[0]*0.5, 
+#                  'cy': screen_resolution[1]*0.5}
+
+camera_params = {
+    'fx': focal_length * image_resolution[0] / sensor_size[0],
+    'fy': focal_length * image_resolution[1] / sensor_size[1],
+    'cx': image_resolution[0] / 2,
+    'cy': image_resolution[1] / 2,
+    'cam_x': 0.0,
+    'cam_y': 0.0,
+    'cam_z': 0.0,
+    'cam_yaw': 0.0,
+    'cam_pitch': 0.0,
+    'cam_roll': 0.0
+}
 
 # === Initial guess ===
 
@@ -162,15 +201,27 @@ elif args.single_frame < 470 :
         400
     ])
 else:
-    x0 = np.array([
+    # x0 = np.array([
+    #     np.deg2rad(-5),
+    #     np.deg2rad(-30), 
+    #     np.deg2rad(75),
+    #     np.deg2rad(15),
+    #     1300,
+    #     100,
+    #     650
+    # ])
+        x0 = np.array([
         np.deg2rad(-5),
         np.deg2rad(-30), 
         np.deg2rad(75),
         np.deg2rad(15),
-        1300,
-        100,
-        650
+        10.0,   # Forward
+        2.0,    # Lateral
+        1.0     # Vertical
     ])
+
+# That last comes from the AI, check later. Now the initial guess is in m and 
+# not in pixels
 
 
 
