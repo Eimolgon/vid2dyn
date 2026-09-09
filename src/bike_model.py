@@ -24,21 +24,25 @@ def residual_eqs(x, data, bike_params, camera_params):
 
     return np.array([f01, f02, f03, f04, f05, f06, f07, f08, f09, f10, f11, f12, f13, f14])
 
-def perspective_projection(point, origin, frame, fx, cx, cy, fy=0):
-    '''
-    Create perspective projection into camera plane.
-    '''
-    if fy == 0: 
-        fy = fx
+def perspective_projection(point, camera_center, camera_frame,
+                           fx, fy, cx, cy):
+    """
+    Project a point into the image plane.
 
-    r = point.pos_form(origin)
+    Camera convention:
+        camera_frame.x -> image horizontal axis
+        camera_frame.z -> image vertical axis
+        camera_frame.y -> optical axis / depth
+    """
 
-    x = r.dot(frame.x)
-    y = r.dot(frame.y)
-    z = r.dot(frame.z)
-    
-    u = fx * (x / y) + cx
-    v = fy * (z / y) + cy
+    r = point.pos_from(camera_center)
+
+    Xc = r.dot(camera_frame.x)
+    Yc = r.dot(camera_frame.z)
+    Zc = r.dot(camera_frame.y)
+
+    u = fx * Xc / Zc + cx
+    v = fy * Yc / Zc + cy
 
     return u, v
 
@@ -49,20 +53,26 @@ lr, lf1, lf2 = sp.symbols('l_r, l_f1, l_f2')
 x_r, y_r, z_r = sp.symbols('x_r, y_r, z_r')
 rr, rf = sp.symbols('rr, rf')
 f, cx, cy = sp.symbols('f, cx, cy') # Camera intrinsics
+# Camera extrinsics
+cam_x, cam_y, cam_z = sp.symbols('cam_x cam_y cam_z')
+cam_yaw, cam_pitch, cam_roll = sp.symbols('cam_yaw cam_pitch cam_roll')
+
 
 variables = (phi, theta, psi, delta, x_r, y_r, z_r, lr, lf1, lf2, rr, rf)
 
-N, R, F = sp.symbols('N, R, F', cls=me.ReferenceFrame)
+N, R, F, C = sp.symbols('N, R, F, C', cls=me.ReferenceFrame)
 
 
 R.orient_body_fixed(N, (psi, phi, theta), 'ZXY')
 F.orient_axis(R, delta, R.z)
+C.orient_body_fixed(N, (cam_yaw, cam_pitch, cam_roll), 'ZYX')
 
-Cr = me.Point('C_r')
-Cf = me.Point('C_f')
-S = me.Point('S')
-Q = me.Point('Q')
-O = me.Point('O')
+Cr = me.Point('C_r')    # Rear wheel contact point
+Cf = me.Point('C_f')    # Front wheel contact point
+S = me.Point('S')       # Steering
+Q = me.Point('Q')       # Trail
+O = me.Point('O')       # Origin of the world coordinate system
+P = me.Point('P')       # Pinhole
 
 P1r = me.Point('P_1r') 
 P2r = me.Point('P_2r')
@@ -82,7 +92,7 @@ Cr.set_pos(O, x_r*N.x + y_r*  N.y + z_r*N.z) # assuming that the bicycle is neve
 S.set_pos(Cr, lr * R.x)
 Q.set_pos(S, lf1 * -F.z)
 Cf.set_pos(Q, lf2 * F.x)
-
+P.set_pos(O, cam_x*N.x + cam_y*N.y + cam_z*N.z)
 
 P1r.set_pos(Cr, rr*me.cross(R.y, -me.cross(R.y, N.z)))
 P2r.set_pos(Cr, rr*me.cross(R.y, me.cross(R.y, N.x)))

@@ -697,42 +697,50 @@ def fit_img2model(real_data, initial_guess, bike_parameters, boundaries, camera_
     lower_bound, upper_bound = boundaries
 
     image_data = {
-    'r_Cf_Cr_x': 0, 
-    'r_Cf_Cr_z': 0, 
-    'r_Cr_O_x': 0, 
-    'r_Cr_O_z': 0,
-    'r_P1r_Cr_x': 0,
-    'r_P1r_Cr_z': 0,
-    'r_P3r_Cr_x': 0,
-    'r_P3r_Cr_z': 0,
-    'r_P1f_Cf_x': 0,
-    'r_P1f_Cf_z': 0,
-    'r_P3f_Cf_x': 0,
-    'r_P3f_Cf_z': 0,
-    'r_Q_S_x': 0,
-    'r_Q_S_z': 0
+    'r_Cf_Cr_u': 0, 
+    'r_Cf_Cr_v': 0, 
+    'u_Cr': 0,
+    'v_Cr': 0,
+    'r_P1r_Cr_u': 0,
+    'r_P1r_Cr_v': 0,
+    'r_P3r_Cr_u': 0,
+    'r_P3r_Cr_v': 0,
+    'r_P1f_Cf_u': 0,
+    'r_P1f_Cf_v': 0,
+    'r_P3f_Cf_u': 0,
+    'r_P3f_Cf_v': 0,
+    'r_Q_S_u': 0,
+    'r_Q_S_v': 0
     }
 
     for i in range(len(real_data['r_Cf_Cr_x'])):
 
-        image_data['r_Cf_Cr_x'] = real_data['r_Cf_Cr_x'][i]
-        image_data['r_Cf_Cr_z'] = real_data['r_Cf_Cr_z'][i]
-        image_data['r_Cr_O_x'] = real_data['r_Cr_O_x'][i]
-        image_data['r_Cr_O_z'] = real_data['r_Cr_O_z'][i]
-        image_data['r_P1r_Cr_x'] = real_data['r_P1r_Cr_x'][i]
-        image_data['r_P1r_Cr_z'] = real_data['r_P1r_Cr_z'][i]
-        image_data['r_P3r_Cr_x'] = real_data['r_P3r_Cr_x'][i]
-        image_data['r_P3r_Cr_z'] = real_data['r_P3r_Cr_z'][i]
-        image_data['r_P1f_Cf_x'] = real_data['r_P1f_Cf_x'][i]
-        image_data['r_P1f_Cf_z'] = real_data['r_P1f_Cf_z'][i]
-        image_data['r_P3f_Cf_x'] = real_data['r_P3f_Cf_x'][i]
-        image_data['r_P3f_Cf_z'] = real_data['r_P3f_Cf_z'][i]
-        image_data['r_Q_S_x'] = real_data['r_Q_S_x'][i]
-        image_data['r_Q_S_z'] = real_data['r_Q_S_z'][i]
+        image_data['r_Cf_Cr_u'] = real_data['r_Cf_Cr_u'][i]
+        image_data['r_Cf_Cr_v'] = real_data['r_Cf_Cr_v'][i]
+        # image_data['r_Cr_O_x'] = real_data['r_Cr_O_x'][i]
+        # image_data['r_Cr_O_z'] = real_data['r_Cr_O_z'][i]
+        image_data['u_Cr'] = real_data['u_Cr'][i]
+        image_data['v_Cr'] = real_data['v_Cr'][i]
+        image_data['r_P1r_Cr_u'] = real_data['r_P1r_Cr_u'][i]
+        image_data['r_P1r_Cr_v'] = real_data['r_P1r_Cr_v'][i]
+        image_data['r_P3r_Cr_u'] = real_data['r_P3r_Cr_u'][i]
+        image_data['r_P3r_Cr_v'] = real_data['r_P3r_Cr_v'][i]
+        image_data['r_P1f_Cf_u'] = real_data['r_P1f_Cf_u'][i]
+        image_data['r_P1f_Cf_v'] = real_data['r_P1f_Cf_v'][i]
+        image_data['r_P3f_Cf_u'] = real_data['r_P3f_Cf_u'][i]
+        image_data['r_P3f_Cf_v'] = real_data['r_P3f_Cf_v'][i]
+        image_data['r_Q_S_u'] = real_data['r_Q_S_u'][i]
+        image_data['r_Q_S_v'] = real_data['r_Q_S_v'][i]
 
-        results_iteration = least_squares(model.residual_eqs, x0, 
-                                            args = (image_data, bike_parameters, camera_parameters), 
-                                            bounds = (lower_bound, upper_bound))
+        results_iteration = least_squares(
+            model.residual_eqs, 
+            x0, 
+            args = (
+                image_data, 
+                bike_parameters, 
+                camera_parameters
+                ), 
+                bounds = (lower_bound, upper_bound))
         results_history.append(results_iteration)
         x0_history.append(results_iteration['x'])
 
