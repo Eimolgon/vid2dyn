@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import bike_model as ortpro
-import model_perspective as perpro
+import bike_model_perspective as perpro
 from matplotlib.patches import Ellipse
 from scipy.optimize import least_squares
 # from bike_model import *
@@ -26,9 +26,8 @@ from utils import (
     plot_mbd_model_2d,
     plot_mbd_model_3d,
     plot_dots,
-    fitEllipse_conic,
-    get_normal,
-    set_axes_equal
+    set_axes_equal,
+    generate_synthetic_data
 )
 
 
@@ -50,7 +49,8 @@ parser.add_argument('-f', '--filter',
                     help='Apply low pass filter')
 parser.add_argument('-d', '--data', 
                     type=str, default='0',
-                    help='Choose data directory')
+                    help='Choose data directory. Use \'test\' ' \
+                    'for synthetic data ')
 parser.add_argument('-sf', '--single_frame', 
                     default='0', type=int,
                     help='Extract data from a single frame, requires route to ' \
@@ -109,21 +109,12 @@ bike_params = {
 
 # ----- Test values -----
 
-true_state = np.array([
-    np.deg2rad(-5.0),      # phi
-    np.deg2rad(-10.0),     # theta
-    np.deg2rad(20.0),      # psi
-    np.deg2rad(5.0),       # delta
 
-    2.0,                   # x_r [m]
-    8.0,                   # y_r [m]
-    0.0                    # z_r [m]
-])
 
 
 # ----- Solver boundaries -----
-lower_bound = [-np.pi/2, -np.pi/2, -np.pi/2, -np.pi/2, 0, -np.inf, 0]
-upper_bound = [np.pi/2, np.pi/2, np.pi/2, np.pi/2, 1920, np.inf, 1080]
+lower_bound = [-np.pi/2, -np.pi/2, -np.pi/2, -np.pi/2, -20.0, -20.0, -20.0]
+upper_bound = [np.pi/2, np.pi/2, np.pi/2, np.pi/2, 20.0, 20.0, 20.0]
 boundaries = (lower_bound, upper_bound)
 
 # camera_params = {'f': 24,
@@ -131,53 +122,20 @@ boundaries = (lower_bound, upper_bound)
 #                  'cy': screen_resolution[1]*0.5}
 
 camera_params = {
-    'fx': focal_length * image_resolution[0] / sensor_size[0],
-    'fy': focal_length * image_resolution[1] / sensor_size[1],
-    'cx': image_resolution[0] / 2,
-    'cy': image_resolution[1] / 2,
-    'cam_x': 0.0,
-    'cam_y': 0.0,
-    'cam_z': 0.0,
-    'cam_yaw': 0.0,
-    'cam_pitch': 0.0,
-    'cam_roll': 0.0
-}
+        'fx': focal_length * image_resolution[0] / sensor_size[0],
+        'fy': focal_length * image_resolution[1] / sensor_size[1],
+        'cx': image_resolution[0] / 2,
+        'cy': image_resolution[1] / 2,
+        'cam_x': 0.0,
+        'cam_y': 0.0,
+        'cam_z': 0.0,
+        'cam_yaw': 0.0,
+        'cam_pitch': 0.0,
+        'cam_roll': 0.0
+    }
 
 # === Initial guess ===
 
-# Values for frame 396
-# x0 = np.array([
-#     np.deg2rad(-5),
-#     np.deg2rad(-15), 
-#     np.deg2rad(-45),
-#     np.deg2rad(15),
-#     400,
-#     0,
-#     600
-# ])
-
-
-# Values for frame 417
-# x0 = np.array([
-#     np.deg2rad(0),
-#     np.deg2rad(-21.8), 
-#     np.deg2rad(0),
-#     np.deg2rad(0),
-#     180,
-#     0,
-#     400
-# ])
-
-# Values for frame 480
-# x0 = np.array([
-#     np.deg2rad(-5),
-#     np.deg2rad(-30), 
-#     np.deg2rad(75),
-#     np.deg2rad(15),
-#     1300,
-#     0,
-#     650
-# ])
 
 
 if args.single_frame < 400 :
@@ -350,7 +308,8 @@ if args.single_frame != 0 :
     # bike_params['rf'] = af
     # bike_params['rr'] = ar    
 
-    results_sf, state_sf = fit_img2model(imgdata, x0, bike_params, boundaries, camera_params, ortpro)
+    results_sf, state_sf = fit_img2model(imgdata, x0, bike_params, 
+                                         boundaries, camera_params, ortpro)
     print(f'phi = {np.rad2deg(state_sf[-1][0]):.2f}')
     print(f'theta = {np.rad2deg(state_sf[-1][1]):.2f}')
     print(f'psi = {np.rad2deg(state_sf[-1][2]):.2f}')
@@ -408,10 +367,14 @@ if args.single_frame != 0 :
         fig, axs = plt.subplots()
 
         plot_dots(axs, plot_points_f, 'front')
-        plt.scatter(front_data[:, 0]*screen_resolution[0], (1 - front_data[:, 1])*screen_resolution[1], facecolors='none', edgecolors='red', s=10)
+        plt.scatter(front_data[:, 0]*screen_resolution[0], 
+                    (1 - front_data[:, 1])*screen_resolution[1], 
+                    facecolors='none', edgecolors='red', s=10)
 
         plot_dots(axs, plot_points_r, 'rear')
-        plt.scatter(rear_data[:, 0]*screen_resolution[0], (1 - rear_data[:, 1])*screen_resolution[1], facecolors='none', edgecolors='blue', s=10)
+        plt.scatter(rear_data[:, 0]*screen_resolution[0], 
+                    (1 - rear_data[:, 1])*screen_resolution[1], 
+                    facecolors='none', edgecolors='blue', s=10)
 
         # plot_mbd_model_2d(axs,bike_params, x0, 'guess')
         plot_mbd_model_2d(axs, bike_params, state_sf[-1], 'model')
@@ -438,7 +401,63 @@ if args.single_frame != 0 :
 
         plt.show()
 
-elif args.data != '0':
+
+elif args.data == 'test':
+
+    true_state = np.array([
+        np.deg2rad(-5.0),      # phi
+        np.deg2rad(-10.0),     # theta
+        np.deg2rad(20.0),      # psi
+        np.deg2rad(5.0),       # delta
+
+        2.0,                   # x_r [m]
+        8.0,                   # y_r [m]
+        0.0                    # z_r [m]
+    ])
+
+    synth_data = generate_synthetic_data(true_state, bike_params, camera_params)
+
+    x0_test = np.array([
+        np.deg2rad(0.0),
+        np.deg2rad(0.0),
+        np.deg2rad(0.0),
+        np.deg2rad(0.0),
+        1.0,
+        1.0,
+        1.0
+    ])
+
+    results, states = fit_img2model(
+        synth_data,
+        x0_test,
+        bike_params,
+        (lower_bound, upper_bound),
+        camera_params,
+        perpro
+    )
+
+    estimated_state = states[-1]
+
+    print("True state:")
+    print(true_state)
+
+    print("\nEstimated state:")
+    print(estimated_state)
+
+    print("\nError:")
+    print(estimated_state - true_state)
+
+    print("\nPosition [m]")
+
+    print("True:")
+    print(true_state[4:])
+
+    print("Estimated:")
+    print(estimated_state[4:])
+
+
+
+elif args.data == '1':
 
     # ----- Data processing -----
     if args.data == 'cut':
