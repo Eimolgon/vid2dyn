@@ -107,11 +107,6 @@ bike_params = {
 }
 
 
-# ----- Test values -----
-
-
-
-
 # ----- Solver boundaries -----
 lower_bound = [-np.pi/2, -np.pi/2, -np.pi/2, -np.pi/2, -20.0, -20.0, -20.0]
 upper_bound = [np.pi/2, np.pi/2, np.pi/2, np.pi/2, 20.0, 20.0, 20.0]
@@ -404,6 +399,33 @@ if args.single_frame != 0 :
 
 elif args.data == 'test':
 
+    # ----- Test parameters -----
+    bike_params = {
+    'lr': 1.0,
+    'lf1': 0.5,
+    'lf2': 0.1,
+    'rf': wheel_diameter/2,
+    'rr': wheel_diameter/2 
+    }
+
+    camera_params = {
+            'fx': focal_length * image_resolution[0] / sensor_size[0],
+            'fy': focal_length * image_resolution[1] / sensor_size[1],
+            'cx': image_resolution[0] / 2,
+            'cy': image_resolution[1] / 2,
+            'cam_x': 0.0,
+            'cam_y': 0.0,
+            'cam_z': 0.0,
+            'cam_yaw': 0.0,
+            'cam_pitch': 0.0,
+            'cam_roll': 0.0
+        }
+
+    lower_bound = [-np.pi/2, -np.pi/2, -np.pi/2, -np.pi/2, -20.0, -20.0, -20.0]
+    upper_bound = [np.pi/2, np.pi/2, np.pi/2, np.pi/2, 20.0, 20.0, 20.0]
+    boundaries = (lower_bound, upper_bound)
+
+    
     true_state = np.array([
         np.deg2rad(-5.0),      # phi
         np.deg2rad(-10.0),     # theta
@@ -415,7 +437,8 @@ elif args.data == 'test':
         0.0                    # z_r [m]
     ])
 
-    synth_data = generate_synthetic_data(true_state, bike_params, camera_params)
+    synth_data = generate_synthetic_data(true_state, bike_params, 
+                                         camera_params, perpro)
 
     x0_test = np.array([
         np.deg2rad(0.0),

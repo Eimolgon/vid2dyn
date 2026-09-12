@@ -1032,7 +1032,7 @@ def get_normal(a, b, c, d, e, f):
     return normal
 
 
-def generate_synthetic_data(x, bike_params, camera_params):
+def generate_synthetic_data(x, bike_params, camera_params, model):
 
     subs = (
         x[0], x[1], x[2], x[3], x[4], x[5], x[6],
@@ -1048,26 +1048,26 @@ def generate_synthetic_data(x, bike_params, camera_params):
     )
 
     return {
-        'r_Cf_Cr_u': [eval_f01(*subs)],
-        'r_Cf_Cr_v': [eval_f02(*subs)],
+        'r_Cf_Cr_u': [model.eval_f01(*subs)],
+        'r_Cf_Cr_v': [model.eval_f02(*subs)],
 
-        'u_Cr': [eval_f03(*subs)],
-        'v_Cr': [eval_f04(*subs)],
+        'u_Cr': [model.eval_f03(*subs)],
+        'v_Cr': [model.eval_f04(*subs)],
 
-        'r_P1r_Cr_u': [eval_f05(*subs)],
-        'r_P1r_Cr_v': [eval_f06(*subs)],
+        'r_P1r_Cr_u': [model.eval_f05(*subs)],
+        'r_P1r_Cr_v': [model.eval_f06(*subs)],
 
-        'r_P3r_Cr_u': [eval_f07(*subs)],
-        'r_P3r_Cr_v': [eval_f08(*subs)],
+        'r_P3r_Cr_u': [model.eval_f07(*subs)],
+        'r_P3r_Cr_v': [model.eval_f08(*subs)],
 
-        'r_P1f_Cf_u': [eval_f09(*subs)],
-        'r_P1f_Cf_v': [eval_f10(*subs)],
+        'r_P1f_Cf_u': [model.eval_f09(*subs)],
+        'r_P1f_Cf_v': [model.eval_f10(*subs)],
 
-        'r_P3f_Cf_u': [eval_f11(*subs)],
-        'r_P3f_Cf_v': [eval_f12(*subs)],
+        'r_P3f_Cf_u': [model.eval_f11(*subs)],
+        'r_P3f_Cf_v': [model.eval_f12(*subs)],
 
-        'r_Q_S_u': [eval_f13(*subs)],
-        'r_Q_S_v': [eval_f14(*subs)]
+        'r_Q_S_u': [model.eval_f13(*subs)],
+        'r_Q_S_v': [model.eval_f14(*subs)]
     }
 # ----- ------ ----- ----- -----
 

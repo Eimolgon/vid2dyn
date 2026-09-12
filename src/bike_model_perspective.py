@@ -58,10 +58,15 @@ def perspective_projection(point, camera_center, camera_frame,
     Yc = r.dot(camera_frame.y)
     Zc = r.dot(camera_frame.z)
 
-    u = fx * Xc / Zc + cx
-    v = fy * Yc / Zc + cy
+    # u = fx * Xc / Zc + cx
+    # v = fy * Yc / Zc + cy
     # Watch out here and check for the coordinates from the original image
 
+
+    u = fx * Xc / Yc + cx
+    v = fy * Yc / Yc + cy
+
+    
     return u, v
 
 
