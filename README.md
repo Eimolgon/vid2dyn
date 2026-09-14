@@ -41,8 +41,8 @@ To-Do
 - [x] Check ellipse animation https://stackoverflow.com/questions/78113285/time-control-bar-for-animation-in-matplotlib
 - [x] Check ellipse reconstruction
 - [ ] Use previous frames to estimate next state
-- [ ] Add dashed line plot in 3d to show initial guess
-- [ ] Add constraint for wheel size
+- [x] Add dashed line plot in 3d to show initial guess
+- [x] Add constraint for wheel size
 
 
 
@@ -50,17 +50,38 @@ Directory structure
 -------------------
 
 ```
-Video2Dynamics/
-|   README.MD
-|   ellipse2data3.py
+vid2dyn/
+|   README.md
+|   vid2dyn-env.yml
 |   LICENSE
 |   AI_disclaimer.md
+|
+|___src/
+|   |   bike_model_perspective.py
+|   |   bike_model.py
+|   |   ellipse2data3.py
+|   |   main.py
+|   |   model_perspective.py
+|   |   utils.py
 |
 |___output/
 |   |   data4model.json
 |   |___animation/
 |   |___plot/
-
+|
+|___archive/
+|   |   kine_fit.ipynb
+|   |   single_state.ipynb
+|   |   video_states.ipynb
+|
+|___tests/
+|   |   code_try.py
+|   |   codetry.ipynb
+|   |   model_tests.py
+|   |   projection_try.ipynb
+|   |   projection_try.py
+|   |   test_code.ipynb
+|   |   
 ```
 
 

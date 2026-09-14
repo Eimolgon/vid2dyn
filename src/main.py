@@ -99,7 +99,7 @@ focal_length = 0.028
 # }
 
 bike_params = {
-    'lr': 1.0,
+    'lr': 1.4,
     'lf1': 0.5,
     'lf2': 0.1,
     'rf': wheel_diameter/2,
@@ -123,7 +123,7 @@ camera_params = {
         'cy': image_resolution[1] / 2,
         'cam_x': 0.0,
         'cam_y': 0.0,
-        'cam_z': 0.0,
+        'cam_z': 0.45,
         'cam_yaw': 0.0,
         'cam_pitch': 0.0,
         'cam_roll': 0.0
@@ -134,24 +134,33 @@ camera_params = {
 
 
 if args.single_frame < 400 :
+    # x0 = np.array([
+    #     np.deg2rad(-5),
+    #     np.deg2rad(-15), 
+    #     np.deg2rad(-45),
+    #     np.deg2rad(15),
+    #     1.0,
+    #     1.0,
+    #     1.0
+    # ])
     x0 = np.array([
-        np.deg2rad(-5),
-        np.deg2rad(-15), 
-        np.deg2rad(-45),
-        np.deg2rad(15),
-        400,
-        100,
-        600
-    ])
+            np.deg2rad(0),
+            np.deg2rad(0), 
+            np.deg2rad(0),
+            np.deg2rad(0),
+            2.82,
+            0.1,
+            0
+        ])
 elif args.single_frame < 470 :
     x0 = np.array([
         np.deg2rad(0),
         np.deg2rad(-21.8), 
         np.deg2rad(0),
         np.deg2rad(0),
-        180,
-        100,
-        400
+        5.0,
+        5.0,
+        5.0
     ])
 else:
     # x0 = np.array([
@@ -163,7 +172,7 @@ else:
     #     100,
     #     650
     # ])
-        x0 = np.array([
+    x0 = np.array([
         np.deg2rad(-5),
         np.deg2rad(-30), 
         np.deg2rad(75),
@@ -181,7 +190,9 @@ else:
 if args.single_frame != 0 :
 
     framenum = args.single_frame
-    test_frame_single = f'/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000{framenum}.txt'
+    # test_frame_single = f'/home/eimolgon/Documents/PhD-Project/02-video-data/gopro_test_1_1_cut/labels/Train/frame_000{framenum}.txt'
+
+    test_frame_single = f'/home/eimolgon/Documents/PhD-Project/02-video-data/bike-base01/labels/train/DSC09360.txt'
 
     # Process raw data
     data_points = readFile(test_frame_single)
@@ -304,7 +315,7 @@ if args.single_frame != 0 :
     # bike_params['rr'] = ar    
 
     results_sf, state_sf = fit_img2model(imgdata, x0, bike_params, 
-                                         boundaries, camera_params, ortpro)
+                                         boundaries, camera_params, perpro)
     print(f'phi = {np.rad2deg(state_sf[-1][0]):.2f}')
     print(f'theta = {np.rad2deg(state_sf[-1][1]):.2f}')
     print(f'psi = {np.rad2deg(state_sf[-1][2]):.2f}')
@@ -401,7 +412,7 @@ elif args.data == 'test':
 
     # ----- Test parameters -----
     bike_params = {
-    'lr': 1.0,
+    'lr': 1.4,
     'lf1': 0.5,
     'lf2': 0.1,
     'rf': wheel_diameter/2,
@@ -441,7 +452,7 @@ elif args.data == 'test':
                                          camera_params, perpro)
 
     x0_test = np.array([
-        np.deg2rad(0.0),
+        np.deg2rad(5.0),
         np.deg2rad(0.0),
         np.deg2rad(0.0),
         np.deg2rad(0.0),

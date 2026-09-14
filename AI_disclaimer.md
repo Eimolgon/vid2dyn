@@ -16,3 +16,9 @@ version. Final version of the code was modified.
 - Function `params2ellipse` was made using Microsoft Copilot enterprise
 version. Final version of the code was modified.
 
+
+src/
+----
+
+- The code was adjusted from orthogonal projection to perspective projection
+using ChatGPT-5.6 Luna. 
