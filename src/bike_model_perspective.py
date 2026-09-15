@@ -46,35 +46,35 @@ def perspective_projection(point, camera_center, camera_frame,
     if fy == 0:
         fy = fx
 
-    # if cx == 0:
-    #     cx = screen_resolution[0]/2
-
-    # if cy == 0:
-    #     cy = screen_resolution[1]/2
-
     r = point.pos_from(camera_center)
 
     Xc = r.dot(camera_frame.x)
     Yc = r.dot(camera_frame.y)
     Zc = r.dot(camera_frame.z)
 
-    # u = fx * Xc / Zc + cx
-    # v = fy * Yc / Zc + cy
-    # Watch out here and check for the coordinates from the original image
-
-
     u = fx * Xc / Yc + cx
-    v = fy * Yc / Yc + cy
-
+    v = fy * Zc / Yc + cy
     
     return u, v
-
 
 
 phi, theta, psi, delta = sp.symbols('varphi, theta, psi, delta')
 lr, lf1, lf2 = sp.symbols('l_r, l_f1, l_f2')
 x_r, y_r, z_r = sp.symbols('x_r, y_r, z_r')
 rr, rf = sp.symbols('rr, rf')
+
+# ===== Camera =====
+
+"""
+Camera frame convention:
+    C.x : image horizontal, positive right
+    C.y : optical axis / depth, positive forward
+    C.z : image vertical, positive up
+
+Perspective projection:
+    u = fx * Xc / Yc + cx
+    v = fy * Zc / Yc + cy
+"""
 
 # Camera intrinsics
 fx, fy, cx, cy = sp.symbols('fx, fy, cx, cy') 
@@ -177,108 +177,21 @@ r_P3f_Cf_v = v_P3f - v_Cf
 
 eval_f01 = sp.lambdify(variables, r_Cf_Cr_u)
 eval_f02 = sp.lambdify(variables, r_Cf_Cr_v)
+
 eval_f03 = sp.lambdify(variables, u_Cr)
 eval_f04 = sp.lambdify(variables, v_Cr)
+
 eval_f05 = sp.lambdify(variables, r_P1r_Cr_u)
 eval_f06 = sp.lambdify(variables, r_P1r_Cr_v)
+
 eval_f07 = sp.lambdify(variables, r_P3r_Cr_u)
 eval_f08 = sp.lambdify(variables, r_P3r_Cr_v)
+
 eval_f09 = sp.lambdify(variables, r_P1f_Cf_u)
 eval_f10 = sp.lambdify(variables, r_P1f_Cf_v)
+
 eval_f11 = sp.lambdify(variables, r_P3f_Cf_u)
 eval_f12 = sp.lambdify(variables, r_P3f_Cf_v)
+
 eval_f13 = sp.lambdify(variables, r_Q_S_u)
 eval_f14 = sp.lambdify(variables, r_Q_S_v)
-
-# eval_f15 = sp.lambdify(variables, r_Cf_Cr_y)
-# eval_f16 = sp.lambdify(variables, r_Cr_O_y)
-# eval_f17 = sp.lambdify(variables, r_Q_S_y)
-# eval_f18 = sp.lambdify(variables, r_P1r_Cr_y)
-# eval_f19 = sp.lambdify(variables, r_P3r_Cr_y)
-# eval_f20 = sp.lambdify(variables, r_P1f_Cf_y)
-# eval_f21 = sp.lambdify(variables, r_P3f_Cf_y)
-
-
-# # ----- Segments for plotting -----
-
-# r_Cr_O_y = Cr.pos_from(O).dot(N.y)
-
-# r_S_O_x = S.pos_from(O).dot(N.x)
-# r_S_O_y = S.pos_from(O).dot(N.y)
-# r_S_O_z = S.pos_from(O).dot(N.z)
-
-# r_Q_O_x = Q.pos_from(O).dot(N.x)
-# r_Q_O_y = Q.pos_from(O).dot(N.y)
-# r_Q_O_z = Q.pos_from(O).dot(N.z)
-
-# r_Cf_O_x = Cf.pos_from(O).dot(N.x)
-# r_Cf_O_y = Cf.pos_from(O).dot(N.y)
-# r_Cf_O_z = Cf.pos_from(O).dot(N.z)
-
-# r_P1r_O_x = P1r.pos_from(O).dot(N.x)
-# r_P1r_O_y = P1r.pos_from(O).dot(N.y)
-# r_P1r_O_z = P1r.pos_from(O).dot(N.z)
-
-# r_P1f_O_x = P1f.pos_from(O).dot(N.x)
-# r_P1f_O_y = P1f.pos_from(O).dot(N.y)
-# r_P1f_O_z = P1f.pos_from(O).dot(N.z)
-
-# r_P2r_O_x = P2r.pos_from(O).dot(N.x)
-# r_P2r_O_y = P2r.pos_from(O).dot(N.y)
-# r_P2r_O_z = P2r.pos_from(O).dot(N.z)
-
-# r_P2f_O_x = P2f.pos_from(O).dot(N.x)
-# r_P2f_O_y = P2f.pos_from(O).dot(N.y)
-# r_P2f_O_z = P2f.pos_from(O).dot(N.z)
-
-# r_P3r_O_x = P3r.pos_from(O).dot(N.x)
-# r_P3r_O_y = P3r.pos_from(O).dot(N.y)
-# r_P3r_O_z = P3r.pos_from(O).dot(N.z)
-
-# r_P3f_O_x = P3f.pos_from(O).dot(N.x)
-# r_P3f_O_y = P3f.pos_from(O).dot(N.y)
-# r_P3f_O_z = P3f.pos_from(O).dot(N.z)
-
-# r_P4r_O_x = P4r.pos_from(O).dot(N.x)
-# r_P4r_O_y = P4r.pos_from(O).dot(N.y)
-# r_P4r_O_z = P4r.pos_from(O).dot(N.z)
-
-# r_P4f_O_x = P4f.pos_from(O).dot(N.x)
-# r_P4f_O_y = P4f.pos_from(O).dot(N.y)
-# r_P4f_O_z = P4f.pos_from(O).dot(N.z)
-
-
-# eval_p01 = sp.lambdify(variables, r_Cr_O_y)
-# eval_p02 = sp.lambdify(variables, r_S_O_x)
-# eval_p03 = sp.lambdify(variables, r_S_O_y)
-# eval_p04 = sp.lambdify(variables, r_S_O_z)
-# eval_p05 = sp.lambdify(variables, r_Q_O_x)
-# eval_p06 = sp.lambdify(variables, r_Q_O_y)
-# eval_p07 = sp.lambdify(variables, r_Q_O_z)
-# eval_p08 = sp.lambdify(variables, r_Cf_O_x)
-# eval_p09 = sp.lambdify(variables, r_Cf_O_y)
-# eval_p10 = sp.lambdify(variables, r_Cf_O_z)
-# eval_p11 = sp.lambdify(variables, r_P1r_O_x)
-# eval_p12 = sp.lambdify(variables, r_P1r_O_y)
-# eval_p13 = sp.lambdify(variables, r_P1r_O_z)
-# eval_p14 = sp.lambdify(variables, r_P1f_O_x)
-# eval_p15 = sp.lambdify(variables, r_P1f_O_y)
-# eval_p16 = sp.lambdify(variables, r_P1f_O_z)
-# eval_p17 = sp.lambdify(variables, r_P2r_O_x)
-# eval_p18 = sp.lambdify(variables, r_P2r_O_y)
-# eval_p19 = sp.lambdify(variables, r_P2r_O_z)
-# eval_p20 = sp.lambdify(variables, r_P2f_O_x)
-# eval_p21 = sp.lambdify(variables, r_P2f_O_y)
-# eval_p22 = sp.lambdify(variables, r_P2f_O_z)
-# eval_p23 = sp.lambdify(variables, r_P3r_O_x)
-# eval_p24 = sp.lambdify(variables, r_P3r_O_y)
-# eval_p25 = sp.lambdify(variables, r_P3r_O_z)
-# eval_p26 = sp.lambdify(variables, r_P3f_O_x)
-# eval_p27 = sp.lambdify(variables, r_P3f_O_y)
-# eval_p28 = sp.lambdify(variables, r_P3f_O_z)
-# eval_p29 = sp.lambdify(variables, r_P4r_O_x)
-# eval_p30 = sp.lambdify(variables, r_P4r_O_y)
-# eval_p31 = sp.lambdify(variables, r_P4r_O_z)
-# eval_p32 = sp.lambdify(variables, r_P4f_O_x)
-# eval_p33 = sp.lambdify(variables, r_P4f_O_y)
-# eval_p34 = sp.lambdify(variables, r_P4f_O_z)
