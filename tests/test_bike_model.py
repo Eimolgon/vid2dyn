@@ -1,4 +1,5 @@
 import pytest
+import matplotlib.pyplot as plt
 from src.bike_model_perspective import *
 
 idx_frame_roll  = 0
@@ -34,10 +35,7 @@ idx_test_x = 22
 idx_test_y = 23
 idx_test_z = 24
 
-@pytest.mark.parametrize(
-    'radius',
-    [100, 250, 300, 350, 500]
-)
+
 
 def make_test_subs():
     """
@@ -54,6 +52,17 @@ def make_test_subs():
         0, 0, 0,          # yaw, pitch, roll
         0, 0, 0           # x_test, y_test, z_test
     ]
+
+
+def set_camera_orientation(subs, yaw=0, pitch=0, roll=0):
+
+    subs = list(subs)
+
+    subs[idx_cam_yaw] = yaw
+    subs[idx_cam_pitch] = pitch
+    subs[idx_cam_roll] = roll
+
+    return tuple(subs)
 
 
 def evaluate_vector(vector, frame, subs):
@@ -117,27 +126,11 @@ def test_rear_frame_zero_orientation():
     np.testing.assert_allclose(result_z, [0, 0, 1])
 
 
-def set_camera_orientation(subs, yaw=0, pitch=0, roll=0):
-
-    subs = list(subs)
-
-    subs[idx_cam_yaw] = yaw
-    subs[idx_cam_pitch] = pitch
-    subs[idx_cam_roll] = roll
-
-    return tuple(subs)
-
-
 def test_camera_orientation_zero():
 
     subs = make_test_subs()
 
-    subs = set_camera_orientation(
-        subs,
-        yaw=0,
-        pitch=0,
-        roll=0
-    )
+    subs = set_camera_orientation(subs, yaw=0, pitch=0, roll=0)
 
     x = evaluate_vector(C.x, N, subs)
     y = evaluate_vector(C.y, N, subs)
@@ -153,12 +146,7 @@ def test_camera_yaw_90():
 
     subs = make_test_subs()
 
-    subs = set_camera_orientation(
-        subs,
-        yaw=np.pi/2,
-        pitch=0,
-        roll=0
-    )
+    subs = set_camera_orientation(subs, yaw=np.pi/2, pitch=0, roll=0)
 
     x = evaluate_vector(C.x, N, subs)
     y = evaluate_vector(C.y, N, subs)
@@ -167,6 +155,36 @@ def test_camera_yaw_90():
     np.testing.assert_allclose(x, [0, 1, 0], atol=1e-12)
     np.testing.assert_allclose(y, [-1, 0, 0], atol=1e-12)
     np.testing.assert_allclose(z, [0, 0, 1], atol=1e-12)
+
+
+def test_camera_roll_90():
+
+    subs = make_test_subs()
+
+    subs = set_camera_orientation(subs, yaw=0, pitch=0, roll=np.pi/2)
+
+    x = evaluate_vector(C.x, N, subs)
+    y = evaluate_vector(C.y, N, subs)
+    z = evaluate_vector(C.z, N, subs)
+
+    np.testing.assert_allclose(x, [1, 0, 0], atol=1e-12)
+    np.testing.assert_allclose(y, [0, 0, 1], atol=1e-12)
+    np.testing.assert_allclose(z, [0, -1, 0], atol=1e-12)    
+
+
+def test_camera_pitch_90():
+
+    subs = make_test_subs()
+
+    subs = set_camera_orientation(subs, yaw=0, pitch=np.pi/2, roll=0)
+
+    x = evaluate_vector(C.x, N, subs)
+    y = evaluate_vector(C.y, N, subs)
+    z = evaluate_vector(C.z, N, subs)
+
+    np.testing.assert_allclose(x, [0, 0, -1], atol=1e-12)
+    np.testing.assert_allclose(y, [0, 1, 0], atol=1e-12)
+    np.testing.assert_allclose(z, [1, 0, 0], atol=1e-12) 
 
 
 def test_camera_translation():
@@ -184,6 +202,7 @@ def test_camera_translation():
     np.testing.assert_allclose(result, [100, 200, 300], atol=1e-12)
 
 
+@pytest.mark.parametrize('radius', [100, 250, 300, 350, 500])
 def test_wheel_radius(radius):
 
     subs = make_test_subs()
@@ -197,14 +216,15 @@ def test_wheel_radius(radius):
 
     np.testing.assert_allclose(result, radius, atol=1e-12)
 
-    return
-
 
 def test_rear_wheel_radius_symbolic():
 
     vector = P1r.pos_from(Cr)
 
     radius_squared = sp.simplify(vector.dot(vector))
+
+    print("P1r-Cr =", vector)
+    print("|P1r-Cr|² =", radius_squared)
 
     assert sp.simplify(radius_squared - rr**2) == 0
 
@@ -287,18 +307,74 @@ def test_trail_distance():
 
     np.testing.assert_allclose(result, 1000, atol=1e-12)
 
-# Add from 15. onwards for projection test
 
+def test_projection():
+
+    subs = make_test_subs()
+
+    subs[idx_test_x] = 2
+    subs[idx_test_y] = 10
+    subs[idx_test_z] = 3
+
+    subs[idx_fx] = 1000     # fx
+    subs[idx_fy] = 1000     # fy
+    subs[idx_cx] = 500      # cx
+    subs[idx_cy] = 400      # cy
+
+    u, v = perspective_projection(testP, P, C, fx, fy, cx, cy)
+
+    eval_u = sp.lambdify(variables, u)
+    eval_v = sp.lambdify(variables, v)
+
+    result_u = float(eval_u(*subs))
+    result_v = float(eval_v(*subs))
+
+    np.testing.assert_allclose(result_u, 700, atol=1e-12)
+
+    np.testing.assert_allclose(result_v, 700, atol=1e-12)
+
+
+@pytest.mark.parametrize('depth', [1, 5, 10, 20, 40])
+def test_projection_depth(depth):
+
+    subs = make_test_subs()
+
+    subs[idx_test_x] = 2
+    subs[idx_test_y] = depth
+    subs[idx_test_z] = 3
+
+    subs[idx_fx] = 1000
+    subs[idx_fy] = 1000
+    subs[idx_cx] = 500
+    subs[idx_cy] = 400
+
+    u, v = perspective_projection(testP, P, C, fx, fy, cx, cy)
+
+    eval_u = sp.lambdify(variables, u)
+    eval_v = sp.lambdify(variables, v)
+
+    result_u = float(eval_u(*subs))
+    result_v = float(eval_v(*subs))
+
+    expected_u = 1000 * 2 / depth + 500
+    expected_v = 1000 * 3 / depth + 400
+
+    np.testing.assert_allclose(result_u, expected_u, atol=1e-12)
+
+    np.testing.assert_allclose(result_v, expected_v, atol=1e-12)
+
+
+# ----- Don't remove any of these lines -----
 x_test, y_test, z_test = sp.symbols('x_t, y_t, z_t')
+
 testP = me.Point('P_t')
 testP.set_pos(O, x_test*N.x + y_test*N.y + z_test*N.z)
 
-variables = (phi, theta, psi, delta, 
-             x_r, y_r, z_r, 
-             lr, lf1, lf2, 
+variables = (phi, theta, psi, delta,
+             x_r, y_r, z_r,
+             lr, lf1, lf2,
              rr, rf,
              fx, fy, cx, cy,
              cam_x, cam_y, cam_z,
              cam_yaw, cam_pitch, cam_roll,
              x_test, y_test, z_test)
-

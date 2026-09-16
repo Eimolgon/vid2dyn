@@ -7,6 +7,9 @@ Ellipse2Data
 
 - [ellipse2data](ellipse2data.py)
 
+To run the tests
+`pytest -q tests/test_bike_model.py`
+
 Example usage for filtered data:
 `python ellipse2data.py /path/to/folder/ --cutoff 1.5 --fs 30`
 
@@ -75,13 +78,15 @@ vid2dyn/
 |   |   video_states.ipynb
 |
 |___tests/
+|   |   test_bike_model.py
+|   |   
+|___archive/
 |   |   code_try.py
 |   |   codetry.ipynb
 |   |   model_tests.py
 |   |   projection_try.ipynb
 |   |   projection_try.py
 |   |   test_code.ipynb
-|   |   
 ```
 
 

@@ -129,15 +129,15 @@ Q.set_pos(S, lf1 * -F.z)
 Cf.set_pos(Q, lf2 * F.x)
 P.set_pos(O, cam_x*N.x + cam_y*N.y + cam_z*N.z)
 
-P1r.set_pos(Cr, rr*me.cross(R.y, -me.cross(R.y, N.z)))
-P2r.set_pos(Cr, rr*me.cross(R.y, me.cross(R.y, N.x)))
-P3r.set_pos(Cr, rr*me.cross(R.y, me.cross(R.y, N.z)))
-P4r.set_pos(Cr, rr*me.cross(R.y, me.cross(R.y, -N.x)))
+P1r.set_pos(Cr, rr*me.cross(R.y, -me.cross(R.y, N.z)).normalize())
+P2r.set_pos(Cr, rr*me.cross(R.y, me.cross(R.y, N.x)).normalize())
+P3r.set_pos(Cr, rr*me.cross(R.y, me.cross(R.y, N.z)).normalize())
+P4r.set_pos(Cr, rr*me.cross(R.y, me.cross(R.y, -N.x)).normalize())
 
-P1f.set_pos(Cf, rf*me.cross(F.y, -me.cross(F.y, N.z)))
-P2f.set_pos(Cf, rf*me.cross(F.y, me.cross(F.y, N.x)))
-P3f.set_pos(Cf, rf*me.cross(F.y, me.cross(F.y, N.z)))
-P4f.set_pos(Cf, rf*me.cross(F.y, me.cross(F.y, -N.x)))
+P1f.set_pos(Cf, rf*me.cross(F.y, -me.cross(F.y, N.z)).normalize())
+P2f.set_pos(Cf, rf*me.cross(F.y, me.cross(F.y, N.x)).normalize())
+P3f.set_pos(Cf, rf*me.cross(F.y, me.cross(F.y, N.z)).normalize())
+P4f.set_pos(Cf, rf*me.cross(F.y, me.cross(F.y, -N.x)).normalize())
 
 # Perspective projections
 u_Cr, v_Cr = perspective_projection(Cr, P, C, fx, fy, cx, cy)
