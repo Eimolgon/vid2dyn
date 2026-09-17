@@ -10,6 +10,9 @@ Ellipse2Data
 To run the tests
 `pytest -q tests/test_bike_model.py`
 
+To run the visual test for projection
+`python -m tests.test_bike_model`
+
 Example usage for filtered data:
 `python ellipse2data.py /path/to/folder/ --cutoff 1.5 --fs 30`
 
