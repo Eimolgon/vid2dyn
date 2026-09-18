@@ -11,6 +11,6 @@ runs/
 output/
 _pycache_/
 __pycache__/
-tmp/
+
 temp/
 .pytest_cache/
