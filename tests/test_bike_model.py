@@ -523,6 +523,33 @@ def test_projection_depth(depth):
     np.testing.assert_allclose(result_v, expected_v, atol=1e-12)
 
 
+def test_projection_camera_yaw_90():
+    """
+    Rotates pi/2 around N.z
+        C.x -> N.y
+        C.y -> -N.x
+        C.z -> N.z
+    """
+    subs = make_test_subs()
+    subs[idx_test_x] = 5.0
+    subs[idx_test_y] = 0.0
+    subs[idx_test_z] = 0.0
+    subs[idx_fx] = 1000
+    subs[idx_fy] = 1000
+    subs[idx_cx] = 300
+    subs[idx_cy] = 200
+    subs = set_camera_orientation(subs, yaw=np.pi/2)
+
+    u, v = perspective_projection(testP, P, C, fx, fy, cx, cy)
+    eval_u = sp.lambdify(variables, u)
+    eval_v = sp.lambdify(variables, v)
+
+    # Point at N.x=5 is along -C.y (since C.y -> -N.x).
+    # So depth Yc = -5, Xc = 0, Zc = 0 -> u = cx, v = cy.
+    np.testing.assert_allclose(float(eval_u(*subs)), 300, atol=1e-9)
+    np.testing.assert_allclose(float(eval_v(*subs)), 200, atol=1e-9)
+
+
 def visualize_square_projection():
 
     x_t2, y_t2, z_t2, ls = sp.symbols('x_t2, y_t2, z_t2, ls')
