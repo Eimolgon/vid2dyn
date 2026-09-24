@@ -248,7 +248,9 @@ def test_rear_wheel_opposite_points():
     v1 = P1r.pos_from(Cr)
     v3 = P3r.pos_from(Cr)
 
-    assert sp.simplify(v1 + v3) == sp.zeros(3, 1)
+    vd = v1.to_matrix(N) + v3.to_matrix(N)
+
+    assert sp.simplify(vd) == sp.zeros(3, 1)
 
 
 def test_front_wheel_opposite_points():
@@ -256,7 +258,9 @@ def test_front_wheel_opposite_points():
     v1 = P1f.pos_from(Cf)
     v3 = P3f.pos_from(Cf)
 
-    assert sp.simplify(v1 + v3) == sp.zeros(3, 1)
+    vd = v1.to_matrix(N) + v3.to_matrix(N)
+    
+    assert sp.simplify(vd) == sp.zeros(3, 1)
 
 
 def test_rear_wheel_plane():
@@ -544,10 +548,144 @@ def test_projection_camera_yaw_90():
     eval_u = sp.lambdify(variables, u)
     eval_v = sp.lambdify(variables, v)
 
-    # Point at N.x=5 is along -C.y (since C.y -> -N.x).
-    # So depth Yc = -5, Xc = 0, Zc = 0 -> u = cx, v = cy.
     np.testing.assert_allclose(float(eval_u(*subs)), 300, atol=1e-9)
     np.testing.assert_allclose(float(eval_v(*subs)), 200, atol=1e-9)
+
+
+def test_projection_camera_pitch_90():
+    # Double check rotation tests
+    """
+    Rotates pi/2 around N.y
+        C.x -> -N.z
+        C.y ->  N.y
+        C.z ->  N.x
+    """
+    subs = make_test_subs()
+    subs[idx_test_x] = 0.0
+    subs[idx_test_y] = 5.0
+    subs[idx_test_z] = 0.0
+    subs[idx_fx] = subs[idx_fy] = 1000
+    subs[idx_cx] = subs[idx_cy] = 0
+    subs = set_camera_orientation(subs, pitch=np.pi/2)
+
+    u, v = perspective_projection(testP, P, C, fx, fy, cx, cy)
+    eval_u = sp.lambdify(variables, u)
+    eval_v = sp.lambdify(variables, v)
+
+    np.testing.assert_allclose(float(eval_u(*subs)), 0, atol=1e-9)
+    np.testing.assert_allclose(float(eval_v(*subs)), 0, atol=1e-9)
+
+
+def test_projection_camera_roll_90():
+    """
+    Rotates pi/2 around N.x
+    """
+    subs = make_test_subs()
+    subs[idx_test_x] = 0.0
+    subs[idx_test_y] = 0.0
+    subs[idx_test_z] = 5.0
+    subs[idx_fx] = subs[idx_fy] = 1000
+    subs[idx_cx] = subs[idx_cy] = 0
+    subs = set_camera_orientation(subs, roll=np.pi/2)
+
+    u, v = perspective_projection(testP, P, C, fx, fy, cx, cy)
+    eval_u = sp.lambdify(variables, u)
+    eval_v = sp.lambdify(variables, v)
+    np.testing.assert_allclose(float(eval_u(*subs)), 0, atol=1e-9)
+    np.testing.assert_allclose(float(eval_v(*subs)), 0, atol=1e-9)
+
+
+def test_projection_principal_point_offset():
+    """Principal point shifts the image by (cx, cy) exactly."""
+    subs = make_test_subs()
+    subs[idx_test_x] = 2.0
+    subs[idx_test_y] = 10.0
+    subs[idx_test_z] = 3.0
+    subs[idx_fx] = subs[idx_fy] = 1000
+    subs[idx_cx] = 0
+    subs[idx_cy] = 0
+
+    u0, v0 = perspective_projection(testP, P, C, fx, fy, cx, cy)
+    e_u0 = sp.lambdify(variables, u0)
+    e_v0 = sp.lambdify(variables, v0)
+    u0v = float(e_u0(*subs))
+    v0v = float(e_v0(*subs))
+
+    subs[idx_cx] = 500
+    subs[idx_cy] = 400
+
+    u1, v1 = perspective_projection(testP, P, C, fx, fy, cx, cy)
+    e_u1 = sp.lambdify(variables, u1)
+    e_v1 = sp.lambdify(variables, v1)
+
+    np.testing.assert_allclose(float(e_u1(*subs)) - u0v, 500, atol=1e-9)
+    np.testing.assert_allclose(float(e_v1(*subs)) - v0v, 400, atol=1e-9)
+
+
+def test_projection_scale_with_fx():
+    """
+    Doubling fx doubles (u - cx) but leaves (v - cy) unchanged (when fy fixed).
+    """
+    subs = make_test_subs()
+    subs[idx_test_x] = 2.0
+    subs[idx_test_y] = 10.0
+    subs[idx_test_z] = 3.0
+    subs[idx_fx] = 1000
+    subs[idx_fy] = 1000
+    subs[idx_cx] = subs[idx_cy] = 0
+
+    u, v = perspective_projection(testP, P, C, fx, fy, cx, cy)
+    e_u = sp.lambdify(variables, u)
+    e_v = sp.lambdify(variables, v)
+    u1 = float(e_u(*subs))
+    v1 = float(e_v(*subs))
+
+    subs[idx_fx] = 2000
+    u2 = float(e_u(*subs))
+    v2 = float(e_v(*subs))
+
+    np.testing.assert_allclose(u2, 2 * u1, atol=1e-9)
+    np.testing.assert_allclose(v2, v1, atol=1e-9)
+
+
+def test_projection_point_behind_camera():
+    """
+    A point behind the camera has Yc < 0; projection flips sign of u, v.
+    """
+    subs = make_test_subs()
+    subs[idx_test_x] = 2.0
+    subs[idx_test_y] = -10.0    # behind (assuming optical axis is +N.y at identity)
+    subs[idx_test_z] = 3.0
+    subs[idx_fx] = subs[idx_fy] = 1000
+    subs[idx_cx] = subs[idx_cy] = 0
+
+    u, v = perspective_projection(testP, P, C, fx, fy, cx, cy)
+    e_u = sp.lambdify(variables, u)
+    e_v = sp.lambdify(variables, v)
+
+    np.testing.assert_allclose(float(e_u(*subs)), -200.0, atol=1e-9)
+    np.testing.assert_allclose(float(e_v(*subs)), -300.0, atol=1e-9)
+
+
+def test_projection_fy_defaults_to_fx():
+    """
+    When fy=0 the function should use fy=fx.
+    """
+    subs = make_test_subs()
+    subs[idx_test_x] = 2.0
+    subs[idx_test_y] = 10.0
+    subs[idx_test_z] = 3.0
+    subs[idx_fx] = 1000
+    subs[idx_fy] = 0
+    subs[idx_cx] = subs[idx_cy] = 0
+
+    u, v = perspective_projection(testP, P, C, fx, fy, cx, cy)
+    e_u = sp.lambdify(variables, u)
+    e_v = sp.lambdify(variables, v)
+
+    np.testing.assert_allclose(float(e_u(*subs)), 200.0, atol=1e-9)
+    np.testing.assert_allclose(float(e_v(*subs)), 300.0, atol=1e-9)
+
 
 
 def visualize_square_projection():
