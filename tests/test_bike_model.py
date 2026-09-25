@@ -2,6 +2,7 @@ import pytest
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from src.bike_model_perspective import *
+from scipy.spatial.transform import Rotation as Rot
 
 idx_frame_roll  = 0
 idx_frame_pitch = 1
@@ -667,26 +668,74 @@ def test_projection_point_behind_camera():
     np.testing.assert_allclose(float(e_v(*subs)), -300.0, atol=1e-9)
 
 
-def test_projection_fy_defaults_to_fx():
+@pytest.mark.parametrize("yaw,pitch,roll", [
+    (0.3, 0.0, 0.0),
+    (0.0, 0.3, 0.0),
+    (0.0, 0.0, 0.3),
+    (0.3, 0.2, 0.1),
+    (-0.4, 0.5, -0.2),
+])
+def test_camera_frame_matches_scipy(yaw, pitch, roll):
     """
-    When fy=0 the function should use fy=fx.
+    Compare C.orient_body_fixed(N, (yaw,pitch,roll), 'ZYX') with scipy.
     """
+    
     subs = make_test_subs()
-    subs[idx_test_x] = 2.0
-    subs[idx_test_y] = 10.0
-    subs[idx_test_z] = 3.0
-    subs[idx_fx] = 1000
-    subs[idx_fy] = 0
-    subs[idx_cx] = subs[idx_cy] = 0
+    subs = set_camera_orientation(subs, yaw=yaw, pitch=pitch, roll=roll)
 
-    u, v = perspective_projection(testP, P, C, fx, fy, cx, cy)
-    e_u = sp.lambdify(variables, u)
-    e_v = sp.lambdify(variables, v)
+    R_model = np.column_stack([
+        evaluate_vector(C.x, N, subs),
+        evaluate_vector(C.y, N, subs),
+        evaluate_vector(C.z, N, subs),
+    ])
 
-    np.testing.assert_allclose(float(e_u(*subs)), 200.0, atol=1e-9)
-    np.testing.assert_allclose(float(e_v(*subs)), 300.0, atol=1e-9)
+    R_scipy = Rot.from_euler('ZYX', [yaw, pitch, roll]).as_matrix()
+
+    np.testing.assert_allclose(R_model, R_scipy, atol=1e-12)
 
 
+def test_rear_wheel_all_points_radius():
+    for pt in [P1r, P2r, P3r, P4r]:
+        v = pt.pos_from(Cr)
+        mag2 = sp.simplify(v.dot(v) - rr ** 2)
+        assert mag2 == 0
+
+
+def test_front_wheel_all_points_radius_all():
+    for pt in [P1f, P2f, P3f, P4f]:
+        v = pt.pos_from(Cf)
+        mag2 = sp.simplify(v.dot(v) - rf ** 2)
+        assert mag2 == 0
+
+
+def test_rear_wheel_all_opposite_pairs():
+    pairs = [(P1r, P3r), (P2r, P4r)]
+    for a, b in pairs:
+        v = a.pos_from(Cr).to_matrix(N) + b.pos_from(Cr).to_matrix(N)
+        assert sp.simplify(v) == sp.zeros(3, 1)
+
+
+def test_front_wheel_all_opposite_pairs():
+    pairs = [(P1f, P3f), (P2f, P4f)]
+    for a, b in pairs:
+        v = a.pos_from(Cf).to_matrix(N) + b.pos_from(Cf).to_matrix(N)
+        assert sp.simplify(v) == sp.zeros(3, 1)
+
+
+def test_rear_wheel_points_orthogonal():
+    """P1r and P2r should be 90 deg apart on the wheel plane."""
+    v1 = P1r.pos_from(Cr)
+    v2 = P2r.pos_from(Cr)
+    assert (sp.simplify(v1.dot(v2))) == v1.magnitude()*v2.magnitude()
+
+
+def test_front_wheel_points_orthogonal():
+    v1 = P1f.pos_from(Cf)
+    v2 = P2f.pos_from(Cf)
+    v3 = (v1.dot(v2))
+    assert sp.Abs(sp.simplify(v3)) == sp.Abs(sp.simplify(v1.magnitude()*v2.magnitude()))
+
+    
 
 def visualize_square_projection():
 

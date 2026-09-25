@@ -34,7 +34,7 @@ def residual_eqs(x, data, bike_params, camera_params):
                      f08, f09, f10, f11, f12, f13, f14])
 
 def perspective_projection(point, camera_center, camera_frame,
-                           fx, fy=0, cx=0, cy=0):
+                           fx, fy, cx, cy):
     """
     Project a point into the image plane.
 
@@ -43,9 +43,7 @@ def perspective_projection(point, camera_center, camera_frame,
         camera_frame.z -> image vertical axis
         camera_frame.y -> optical axis / depth
     """
-    if fy == 0:
-        fy = fx
-
+    
     r = point.pos_from(camera_center)
 
     Xc = r.dot(camera_frame.x)
