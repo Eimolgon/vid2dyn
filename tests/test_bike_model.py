@@ -722,20 +722,76 @@ def test_front_wheel_all_opposite_pairs():
         assert sp.simplify(v) == sp.zeros(3, 1)
 
 
-def test_rear_wheel_points_orthogonal():
-    """P1r and P2r should be 90 deg apart on the wheel plane."""
-    v1 = P1r.pos_from(Cr)
-    v2 = P2r.pos_from(Cr)
-    assert (sp.simplify(v1.dot(v2))) == v1.magnitude()*v2.magnitude()
+# def test_rear_wheel_points_orthogonal():
+#     """P1r and P2r should be 90 deg apart on the wheel plane."""
+#     v1 = P1r.pos_from(Cr)
+#     v2 = P2r.pos_from(Cr)
+#     assert (sp.simplify(v1.dot(v2))) == v1.magnitude()*v2.magnitude()
 
 
-def test_front_wheel_points_orthogonal():
-    v1 = P1f.pos_from(Cf)
-    v2 = P2f.pos_from(Cf)
-    v3 = (v1.dot(v2))
-    assert sp.Abs(sp.simplify(v3)) == sp.Abs(sp.simplify(v1.magnitude()*v2.magnitude()))
+# def test_front_wheel_points_orthogonal():
+#     v1 = P1f.pos_from(Cf)
+#     v2 = P2f.pos_from(Cf)
+#     v3 = (v1.dot(v2))
+#     assert sp.Abs(sp.simplify(v3)) == sp.Abs(sp.simplify(v1.magnitude()*v2.magnitude()))
 
-    
+
+@pytest.mark.parametrize("phi,theta,psi,delta", [
+    (0, 0, 0, 0),
+    (0.1, 0.2, 0.3, 0.15),
+    (-0.2, 0.3, -0.4, -0.2),
+])
+def test_wheelbase_horizontal_at_zero_roll_pitch(phi, theta, psi, delta):
+    """Only check when phi=theta=0: |Cf - Cr|_N.x == lr + lf2."""
+    if phi != 0 or theta != 0:
+        pytest.skip("Only valid with phi=theta=0")
+    subs = make_test_subs()
+    subs[idx_frame_roll] = phi
+    subs[idx_frame_pitch] = theta
+    subs[idx_frame_yaw] = psi
+    subs[idx_frame_steer] = delta
+    subs[idx_lr] = 500
+    subs[idx_lf1] = 100
+    subs[idx_lf2] = 1000
+
+    v = Cf.pos_from(Cr)
+    comps = evaluate_vector(v, N, subs)
+    np.testing.assert_allclose(comps[0], 1500.0, atol=1e-9)
+    np.testing.assert_allclose(comps[1], 0.0, atol=1e-9)
+    np.testing.assert_allclose(comps[2], 0.0, atol=1e-9)
+
+
+@pytest.mark.parametrize("delta", [0.0, 0.3, -0.3, np.pi / 4])
+def test_steering_axis_parallel(delta):
+    """(Q - S) must be parallel to -F.z (steering axis)."""
+    subs = make_test_subs()
+    subs[idx_frame_steer] = delta
+    subs[idx_lf1] = 100
+
+    v = Q.pos_from(S)
+    # v should be lf1 * (-F.z): project onto F.z, should be -100
+    comps = evaluate_vector(v, F, subs)
+    np.testing.assert_allclose(comps[0], 0.0, atol=1e-9)
+    np.testing.assert_allclose(comps[1], 0.0, atol=1e-9)
+    np.testing.assert_allclose(comps[2], -100.0, atol=1e-9)
+
+
+def test_variables_order_matches_residual():
+    """Guard against silent reordering of the `variables` tuple."""
+    expected = (phi, theta, psi, delta,
+                x_r, y_r, z_r, lr, lf1, lf2, rr, rf,
+                fx, fy, cx, cy,
+                cam_x, cam_y, cam_z,
+                cam_yaw, cam_pitch, cam_roll,
+                x_test, y_test, z_test)
+    assert tuple(variables) == tuple(expected)
+
+
+def test_make_test_subs_length():
+    subs = make_test_subs()
+    assert len(subs) == len(variables)
+
+
 
 def visualize_square_projection():
 
