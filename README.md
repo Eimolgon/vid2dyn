@@ -7,7 +7,10 @@ Ellipse2Data
 
 - [ellipse2data](ellipse2data.py)
 
-To run the tests
+To run all the tests
+`pytest tests/ -v`
+
+To run a specific set of tests
 `pytest -q tests/test_bike_model.py`
 
 To run the visual test for projection

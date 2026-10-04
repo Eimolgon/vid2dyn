@@ -12,7 +12,9 @@ RES = (1920, 1080)
 
 
 def implicit(p, e):
-    """(x'/a)^2 + (z'/b)^2 for point p on ellipse e=(x,z,a,b,theta); 1 == on it."""
+    """
+    (x'/a)^2 + (z'/b)^2 for point p on ellipse e=(x,z,a,b,theta); 1 == on it.
+    """
     x, z, a, b, th = e
     dx, dz = p[0] - x, p[1] - z
     xp = dx * np.cos(th) + dz * np.sin(th)

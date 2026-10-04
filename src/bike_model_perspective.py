@@ -154,8 +154,11 @@ u_P3f, v_P3f = perspective_projection(P3f, P, C, fx, fy, cx, cy)
 r_Cf_Cr_u = u_Cf - u_Cr
 r_Cf_Cr_v = v_Cf - v_Cr
 
-r_Q_S_u = u_Q - u_S
-r_Q_S_v = v_Q - v_S
+# r_Q_S_u = (u_Q - u_S).normalize()
+# r_Q_S_v = (v_Q - v_S).normalize()
+
+r_Q_S_u = (u_Q - u_S)
+r_Q_S_v = (v_Q - v_S)
 
 r_P1r_Cr_u = u_P1r - u_Cr
 r_P1r_Cr_v = v_P1r - v_Cr

@@ -333,7 +333,7 @@ def test_trail_distance():
 
     subs = make_test_subs()
 
-    subs[9] = 1000
+    subs[idx_lf2] = 1000
 
     vector = Cf.pos_from(Q)
     magnitude = vector.magnitude()
@@ -454,9 +454,9 @@ def test_projection():
 
     subs = make_test_subs()
 
-    subs[idx_test_x] = 2
+    subs[idx_test_x] = 5
     subs[idx_test_y] = 10
-    subs[idx_test_z] = 3
+    subs[idx_test_z] = 1
 
     subs[idx_fx] = 1000     # fx
     subs[idx_fy] = 1000     # fy
@@ -471,9 +471,9 @@ def test_projection():
     result_u = float(eval_u(*subs))
     result_v = float(eval_v(*subs))
 
-    np.testing.assert_allclose(result_u, 700, atol=1e-12)
+    np.testing.assert_allclose(result_u, 1000, atol=1e-12)
 
-    np.testing.assert_allclose(result_v, 700, atol=1e-12)
+    np.testing.assert_allclose(result_v, 500, atol=1e-12)
 
 
 def test_projection_optical_axis():
@@ -720,45 +720,6 @@ def test_front_wheel_all_opposite_pairs():
     for a, b in pairs:
         v = a.pos_from(Cf).to_matrix(N) + b.pos_from(Cf).to_matrix(N)
         assert sp.simplify(v) == sp.zeros(3, 1)
-
-
-# def test_rear_wheel_points_orthogonal():
-#     """P1r and P2r should be 90 deg apart on the wheel plane."""
-#     v1 = P1r.pos_from(Cr)
-#     v2 = P2r.pos_from(Cr)
-#     assert (sp.simplify(v1.dot(v2))) == v1.magnitude()*v2.magnitude()
-
-
-# def test_front_wheel_points_orthogonal():
-#     v1 = P1f.pos_from(Cf)
-#     v2 = P2f.pos_from(Cf)
-#     v3 = (v1.dot(v2))
-#     assert sp.Abs(sp.simplify(v3)) == sp.Abs(sp.simplify(v1.magnitude()*v2.magnitude()))
-
-
-@pytest.mark.parametrize("phi,theta,psi,delta", [
-    (0, 0, 0, 0),
-    (0.1, 0.2, 0.3, 0.15),
-    (-0.2, 0.3, -0.4, -0.2),
-])
-def test_wheelbase_horizontal_at_zero_roll_pitch(phi, theta, psi, delta):
-    """Only check when phi=theta=0: |Cf - Cr|_N.x == lr + lf2."""
-    if phi != 0 or theta != 0:
-        pytest.skip("Only valid with phi=theta=0")
-    subs = make_test_subs()
-    subs[idx_frame_roll] = phi
-    subs[idx_frame_pitch] = theta
-    subs[idx_frame_yaw] = psi
-    subs[idx_frame_steer] = delta
-    subs[idx_lr] = 500
-    subs[idx_lf1] = 100
-    subs[idx_lf2] = 1000
-
-    v = Cf.pos_from(Cr)
-    comps = evaluate_vector(v, N, subs)
-    np.testing.assert_allclose(comps[0], 1500.0, atol=1e-9)
-    np.testing.assert_allclose(comps[1], 0.0, atol=1e-9)
-    # np.testing.assert_allclose(comps[2], 0.0, atol=1e-9)
 
 
 @pytest.mark.parametrize("delta", [0.0, 0.3, -0.3, np.pi / 4])

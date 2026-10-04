@@ -108,7 +108,7 @@ bike_params = {
 
 
 # ----- Solver boundaries -----
-lower_bound = [-np.pi/2, -np.pi/2, -np.pi/2, -np.pi/2, -20.0, -20.0, -20.0]
+lower_bound = [-np.pi/2, -np.pi/2, -np.pi/2, -np.pi/2, -20.0, 0.1, -20.0]
 upper_bound = [np.pi/2, np.pi/2, np.pi/2, np.pi/2, 20.0, 20.0, 20.0]
 boundaries = (lower_bound, upper_bound)
 
@@ -511,10 +511,12 @@ elif args.data == '1':
     data_model, rear_wheel, front_wheel = data4model(tracking_data, assumed_origin)
     first_frame = tracking_data['first_frame']
     
-    bike_params['rr'] = max(rear_wheel[:, 2])
-    bike_params['rf'] = max(front_wheel[:, 2])
+    # bike_params['rr'] = max(rear_wheel[:, 2])
+    # bike_params['rf'] = max(front_wheel[:, 2])
 
-    results_history, x0_history = fit_img2model(data_model, x0, bike_params, boundaries)
+    results_history, x0_history = fit_img2model(data_model, x0, bike_params, 
+                                                boundaries, camera_params, perpro)
+    
 
     roll_history = []
     pitch_history = []

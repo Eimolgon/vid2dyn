@@ -11,6 +11,6 @@ dependencies:
   - pre_commit==4.5.0
   - nbconvert==7.16.6
   - nbstripout==0.8.2
-  - pandas==2.2.3
+  - pandas==2.3.3
   - ipykernel==6.29.5
   - pytest==9.1.1

@@ -5,7 +5,7 @@ import numpy as np
 import sympy as sp
 import matplotlib.pyplot as plt
 from collections import defaultdict
-from bike_model import *
+from bike_model_perspective import *
 from matplotlib.patches import Ellipse
 import matplotlib.animation as animation
 from matplotlib import collections as mc
@@ -41,85 +41,6 @@ def readFile(file_path):
 
     return ellipses
     
-
-def fitEllipse_old(points, screen_res:tuple):
-    '''
-    Recreates the ellipse to output parameters and angle to the camera plane.
-    Input: points, screen_resolution.
-    Output: fitted ellipse
-    '''
-
-    ell = EllipseModel()
-    ell.estimate(points)
-    u, v, a, b, theta = ell.params
-
-    u = u*screen_res[0]
-    v = screen_res[1]*(1-v)
-    a = a*screen_res[1]
-    b = b*screen_res[0]
-
-
-    ellipse_data = (u, v, a, b, theta)
-
-    return ellipse_data
-
-
-def fitEllipse_old2(points, screen_resolution:tuple):
-    x_i = points[:, 0]*screen_resolution[0]
-    y_i = (1 - points[:, 1])*screen_resolution[1]
-
-    x = x_i[:, np.newaxis]
-    y = y_i[:, np.newaxis]
-    
-    # Design matrix
-    D = np.hstack((x*x, x*y, y*y, x, y, np.ones_like(x)))
-    
-    # Scatter matrix
-    S = np.dot(D.T, D)
-    
-    # Constraint matrix
-    C = np.zeros((6, 6))
-    C[0, 2] = 2
-    C[1, 1] = -1
-    C[2, 0] = 2
-    
-    # Solve generalized eigenvalue problem: S * v = lambda * C * v
-    eigenvalues, eigenvectors = np.linalg.eig(np.linalg.inv(S).dot(C))
-    
-    # The eigenvector corresponding to the only positive eigenvalue is our solution
-    pos_eval_idx = np.where(eigenvalues > 0)[0]
-    if len(pos_eval_idx) == 0:
-        return None  # Should not happen with valid data
-        
-    coeffs = eigenvectors[:, pos_eval_idx[0]]
-
-    a, b, c, d, e, f = coeffs
-
-    num = b**2 - 4*a*c
-    xc = (2*c*d - b*e) / num
-    yc = (2*a*e - b*d) / num
-
-    # 2. Calculate Semi-axes
-    # We use absolute values inside the sqrt to handle sign flips
-    # and floating point noise.
-    up = 2 * (a*e**2 + c*d**2 + f*b**2 - b*d*e - 4*a*c*f)
-    
-    # Term in the denominator
-    term = np.sqrt((a - c)**2 + b**2)
-    
-    # Use abs() to prevent RuntimeWarning from tiny negative numbers 
-    # caused by precision limits.
-    res_a = np.sqrt(np.abs(up / (num * (a + c - term))))
-    res_b = np.sqrt(np.abs(up / (num * (a + c + term))))
-
-    # 3. Calculate Rotation Angle
-    theta = 0.5 * np.arctan2(b, (a - c))
-
-
-    ellipse_coeffs = (xc, yc, res_b, res_a, theta)
-
-    return ellipse_coeffs
-
 
 def fitEllipse(points, resolution):
     """
@@ -196,50 +117,7 @@ def fitEllipse(points, resolution):
     return xc, yc, axis_1, axis_2, theta
 
 
-def fitEllipse_conic(points, resolution):
-    """
-    Fits an ellipse to normalized points and rescales it to screen resolution.
-    
-    Args:
-        points: (N, 2) array of normalized (x, y) coordinates.
-        resolution: (sx, sy) tuple representing the scale factors (e.g., screen width/height).
-        
-    Returns:
-        x, y: Center coordinates in scaled space.
-        a, b: Semi-major and semi-minor axes in scaled space.
-        theta: Rotation angle in radians (standardized range).
-    """
-    sx, sy = resolution
-    xn = points[:, 0]
-    yn = points[:, 1]
-
-    # 1. Fit in normalized space
-    D = np.stack([xn**2, xn*yn, yn**2, xn, yn, np.ones_like(xn)], axis=1)
-    S = D.T @ D
-    C = np.zeros((6, 6))
-    C[0, 2], C[2, 0], C[1, 1] = 2, 2, -1
-    
-    try:
-        evals, evecs = np.linalg.eig(np.linalg.inv(S) @ C)
-        coeffs = evecs[:, np.argmax(evals)]
-    except:
-        return None
-
-    # 2. Map to screen: x = sx*xn, y = sy*(1 - yn)
-    a_n, b_n, c_n, d_n, e_n, f_n = coeffs
-    
-    # Transformation algebra
-    a = a_n / (sx**2)
-    b = -b_n / (sx * sy) 
-    c = c_n / (sy**2)
-    d = (b_n + d_n) / sx
-    e = -(2 * c_n + e_n) / sy
-    f = c_n + e_n + f_n
-
-    return a, b, c, d, e, f
-
-
-def find_points(ellipse, direction):
+def find_points(ellipse):
     '''
     Find extreme points of the ellipse.
     Input: ellipse parameters.
@@ -288,22 +166,22 @@ def find_points(ellipse, direction):
     # I just flip points 2 and 4 because those are the two that are 'in front'
     # and 'behind' of the wheels and will change depending on the direction
     # of travel.
-    if direction == 'right':
-        p2 = (p2_x, p2_z)
-        p4 = (p4_x, p4_z)
-        p2_2 = (x + k*w_x, z + k*w_y)
-        p4_2 = (x - k*w_x, z - k*w_y)
-    elif direction == 'left':
-        p4 = (p2_x, p2_z)
-        p2 = (p4_x, p4_z)
-        p4_2 = (x + k*w_x, z + k*w_y)
-        p2_2 = (x - k*w_x, z - k*w_y)
+    # if direction == 'right':
+    #     p2 = (p2_x, p2_z)
+    #     p4 = (p4_x, p4_z)
+    #     p2_2 = (x + k*w_x, z + k*w_y)
+    #     p4_2 = (x - k*w_x, z - k*w_y)
+    # elif direction == 'left':
+    #     p4 = (p2_x, p2_z)
+    #     p2 = (p4_x, p4_z)
+    #     p4_2 = (x + k*w_x, z + k*w_y)
+    #     p2_2 = (x - k*w_x, z - k*w_y)
 
     p1 = (p1_x, p1_z)
     p3 = (p3_x, p3_z)
     
 
-    return p1, p2, p3, p4, p2_2, p4_2
+    return p1, p2_2, p3, p4_2
 
 
 def process_directory(directory_path, screen_resolution):
@@ -629,14 +507,14 @@ def data4model(track_data, assumed_origin):
     data['r_Cf_Cr_v'] = zf - zr
     data['u_Cr'] = xr
     data['v_Cr'] = zr
-    data['r_P1f_Cf_u'] = p1_r[:, 0] - xr
-    data['r_P1f_Cf_v'] = p1_r[:, 1] - zr
-    data['r_P3f_Cf_u'] = p3_r[:, 0] - xr
-    data['r_P3f_Cf_v'] = p3_r[:, 1] - zr
-    data['r_P1r_Cr_u'] = p1_f[:, 0] - xf
-    data['r_P1r_Cr_v'] = p1_f[:, 1] - zf
-    data['r_P3r_Cr_u'] = p3_f[:, 0] - xf
-    data['r_P3r_Cr_v'] = p3_f[:, 1] - zf
+    data['r_P1f_Cf_u'] = p1_f[:, 0] - xf
+    data['r_P1f_Cf_v'] = p1_f[:, 1] - zf
+    data['r_P3f_Cf_u'] = p3_f[:, 0] - xf
+    data['r_P3f_Cf_v'] = p3_f[:, 1] - zf
+    data['r_P1r_Cr_u'] = p1_r[:, 0] - xr
+    data['r_P1r_Cr_v'] = p1_r[:, 1] - zr
+    data['r_P3r_Cr_u'] = p3_r[:, 0] - xr
+    data['r_P3r_Cr_v'] = p3_r[:, 1] - zr
     data['r_Q_S_u'] = (np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) - 
                      np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
                      np.cos(theta_f - theta_r))*np.sin(theta_f)/ \
@@ -982,54 +860,6 @@ def plot_dots(ax, dots, wheel):
     ax.grid()
 
     return
-
-
-# ----- This is made by copilot so needs checking -----
-
-def get_normal(a, b, c, d, e, f):
-    # extract quadratic form
-    Q = np.array([[a, b/2],
-                  [b/2, c]])
-
-    
-    if np.linalg.det(Q) < 0:
-        Q = -Q
-
-    vals, vecs = np.linalg.eigh(Q)
-
-    eps = 1e-12
-    vals = np.maximum(vals, eps)
-
-    # semi-axes ratios (scale irrelevant)
-    alpha = 1.0 / np.sqrt(vals[1])
-    beta  = 1.0 / np.sqrt(vals[0])
-
-    # major axis direction
-    v = vecs[:, 1]
-    theta = np.arctan2(v[1], v[0])
-
-    u1 = np.array([
-        np.cos(theta) / alpha,
-        np.sin(theta) / alpha,
-        1.0
-    ])
-
-    u2 = np.array([
-        -np.sin(theta) / beta,
-         np.cos(theta) / beta,
-         1.0
-    ])
-
-    n = np.cross(u1, u2)
-    n /= np.linalg.norm(n)
-
-    # Optional: enforce positive Z
-    if n[2] < 0:
-        n = -n
-
-    normal = n
-
-    return normal
 
 
 def generate_synthetic_data(x, bike_params, camera_params, model):
