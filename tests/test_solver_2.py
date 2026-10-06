@@ -1,3 +1,5 @@
+# tests/test_solver_2.py
+
 """Tests for the least-squares solver (fit_img2model + residual_eqs).
 
 Strategy: generate synthetic image data from a KNOWN state with the model
@@ -160,8 +162,15 @@ def test_solution_respects_bounds(bike_params, camera_params, bounds):
     data = synth(true, bike_params, camera_params)
     x0 = true.copy(); x0[4] = 10.0
     res, hist = utils.fit_img2model(data, x0, bike_params, bounds, camera_params, mdl)
-    assert np.all(hist[-1] >= bounds[0] - 1e-9)
-    assert np.all(hist[-1] <= bounds[1] + 1e-9)
+
+    lo = np.asarray(bounds[0], dtype=float)
+    hi = np.asarray(bounds[1], dtype=float)
+    est = np.asarray(hist[-1], dtype=float)
+
+    # assert np.all(hist[-1] >= bounds[0] - 1e-9)
+    # assert np.all(hist[-1] <= bounds[1] + 1e-9)
+    assert np.all(est >= lo - 1e-9)
+    assert np.all(est <= hi + 1e-9)
     assert hist[-1][4] <= 20.0 + 1e-9
 
 
@@ -235,10 +244,12 @@ def test_qs_data_and_model_use_same_units(bike_params, camera_params):
 
 
 def test_ellipse_pipeline_matches_model_projection(bike_params, camera_params):
-    """Render both wheels with the model -> normalised label points ->
+    """
+    Render both wheels with the model -> normalised label points ->
     fitEllipse -> find_points, and compare with what the model predicts for
     centre / top / bottom points. Any large mismatch is model error that the
-    solver cannot fix (perspective bias of ellipse centre and extremes)."""
+    solver cannot fix (perspective bias of ellipse centre and extremes).
+    """
     true = TRUE_STATES[0].values[0]
     s = pack(true, bike_params, camera_params)
     W, H = IMAGE_RES
@@ -256,7 +267,7 @@ def test_ellipse_pipeline_matches_model_projection(bike_params, camera_params):
         uv = project(wheel_circle(s, wheel), s)
         pts = np.column_stack([uv[:, 0] / W, 1 - uv[:, 1] / H])[::8]   # label format
         xc, yc, a, b, th = utils.fitEllipse(pts, (W, H))
-        p1, _, p3, *_ = utils.find_points((xc, yc, a, b, th), "right")
+        p1, _, p3, *_ = utils.find_points((xc, yc, a, b, th))
         e = expected[wheel]
         tol_c, tol_p = 0.01 * a, 0.05 * a
         assert np.hypot(xc - e["c"][0], yc - e["c"][1]) < tol_c, f"{wheel} centre"

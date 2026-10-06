@@ -1,3 +1,5 @@
+# src/main.py
+
 import json
 import time
 import datetime
@@ -11,6 +13,7 @@ from matplotlib.patches import Ellipse
 from scipy.optimize import least_squares
 # from bike_model import *
 from skimage.draw import ellipse_perimeter
+from interactive import launch_interactive
 
 
 from utils import (
@@ -248,8 +251,8 @@ if args.single_frame != 0 :
     # ----- ----- ----- ----- -----
 
     # Find extreme points of the ellipses
-    p1_f, p2_f, p3_f, p4_f, p2_f_2, p4_f_2 = find_points(ellipse_front, travel_direction)
-    p1_r, p2_r, p3_r, p4_r, p2_r_2, p4_r_2 = find_points(ellipse_rear, travel_direction)
+    p1_f, p2_f, p3_f, p4_f = find_points(ellipse_front)
+    p1_r, p2_r, p3_r, p4_r = find_points(ellipse_rear)
 
 
     plot_points_f = (xf, zf, p1_f, p3_f)
@@ -325,21 +328,30 @@ if args.single_frame != 0 :
     print(f'z = {state_sf[-1][6]:.2f}')
 
 
-    if args.plot == 'e':
-        
+    if args.plot == 'interactive':
+        viewer = launch_interactive(
+            bike_params=bike_params,
+            camera_params=camera_params,
+            state0=x0,                                  # your initial guess
+            image_points={0: front_data, 1: rear_data}, # (N,2) normalised points
+            ellipses={0: ellipse_front, 1: ellipse_rear},
+            screen_resolution=screen_resolution,
+        )
+
+    elif args.plot == 'e':
         plt.plot(xf, zf, 'ok')
         plt.scatter(p1_f[0], p1_f[1], marker='x', color='red')
         plt.scatter(p3_f[0], p3_f[1], marker='x', color='black')
 
-        plt.scatter(p2_f_2[0], p2_f_2[1], marker='p', color='red')
-        plt.scatter(p4_f_2[0], p4_f_2[1], marker='h', color='black')
+        # plt.scatter(p2_f_2[0], p2_f_2[1], marker='p', color='red')
+        # plt.scatter(p4_f_2[0], p4_f_2[1], marker='h', color='black')
 
         plt.plot(xr, zr, 'ok')
         plt.scatter(p1_r[0], p1_r[1], marker='x', color='red')
         plt.scatter(p3_r[0], p3_r[1], marker='x', color='black')
 
-        plt.scatter(p2_r_2[0], p2_r_2[1], marker='p', color='red')
-        plt.scatter(p4_r_2[0], p4_r_2[1], marker='h', color='black')
+        # plt.scatter(p2_r_2[0], p2_r_2[1], marker='p', color='red')
+        # plt.scatter(p4_r_2[0], p4_r_2[1], marker='h', color='black')
 
         ell_patch_f = Ellipse((xf, zf), width = 2*af, height = 2*bf,
                       angle = theta_f*180/np.pi, edgecolor='blue', 

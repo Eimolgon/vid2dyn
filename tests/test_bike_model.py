@@ -1,3 +1,5 @@
+# tests/test_bike_model.py
+
 import pytest
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -785,7 +787,7 @@ def visualize_square_projection():
     subs = make_test_subs()
 
     # ----- camera intrinsics -----
-    fx = 28
+    fx = 100
     fy = fx
     cx = 500
     cy = cx

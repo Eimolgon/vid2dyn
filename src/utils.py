@@ -1,3 +1,5 @@
+# src/utils.py
+
 import os
 import json
 import math
@@ -632,39 +634,188 @@ def fit_img2model(real_data, initial_guess, bike_parameters,
     return results_history, x0_history
 
 
-def points2plot(bike_parameters:dict, state):
-    '''
-    Find the points to plot the model in 2d and 3d.
-    Input: bicycle parameters and state.
-    Output: vector with points.
-    '''
+# def points2plot(bike_parameters:dict, state, camera_params):
+#     '''
+#     Find the points to plot the model in 2d and 3d.
+#     Input: bicycle parameters and state.
+#     Output: vector with points.
+#     '''
 
-    subs = (state[0], state[1], state[2], state[3], state[4], state[5], 
-            state[6], bike_parameters['lr'], bike_parameters['lf1'],
-            bike_parameters['lf2'], bike_parameters['rr'], bike_parameters['rf'])
+#     subs = (state[0], state[1], state[2], state[3], state[4], state[5], 
+#             state[6], bike_parameters['lr'], bike_parameters['lf1'],
+#             bike_parameters['lf2'], bike_parameters['rr'], bike_parameters['rf'],
+#             camera_params['fx'], camera_params['fy'],
+#             camera_params['cx'], camera_params['cy'],
+#             camera_params['cam_x'], camera_params['cam_y'], 
+#             camera_params['cam_z'], camera_params['cam_yaw'], 
+#             camera_params['cam_pitch'],camera_params['cam_roll']
+#             )
     
     
-    Cr_point = (eval_f03(*subs), eval_p01(*subs), eval_f04(*subs))
-    S_point = (eval_p02(*subs), eval_p03(*subs), eval_p04(*subs))
-    Q_point = (eval_p05(*subs), eval_p06(*subs), eval_p07(*subs))
-    Cf_point = (eval_p08(*subs), eval_p09(*subs), eval_p10(*subs))
+#     Cr_point = (eval_f03(*subs), eval_p01(*subs), eval_f04(*subs))
+#     S_point = (eval_p02(*subs), eval_p03(*subs), eval_p04(*subs))
+#     Q_point = (eval_p05(*subs), eval_p06(*subs), eval_p07(*subs))
+#     Cf_point = (eval_p08(*subs), eval_p09(*subs), eval_p10(*subs))
 
-    p1r_point = (eval_p11(*subs), eval_p12(*subs), eval_p13(*subs))
-    p3r_point = (eval_p23(*subs), eval_p24(*subs), eval_p25(*subs))
+#     p1r_point = (eval_p11(*subs), eval_p12(*subs), eval_p13(*subs))
+#     p3r_point = (eval_p23(*subs), eval_p24(*subs), eval_p25(*subs))
 
-    p1f_point = (eval_p14(*subs), eval_p15(*subs), eval_p16(*subs))
-    p3f_point = (eval_p26(*subs), eval_p27(*subs), eval_p28(*subs))
+#     p1f_point = (eval_p14(*subs), eval_p15(*subs), eval_p16(*subs))
+#     p3f_point = (eval_p26(*subs), eval_p27(*subs), eval_p28(*subs))
 
-    p2r_point = (eval_p17(*subs), eval_p18(*subs), eval_p19(*subs))
-    p4r_point = (eval_p29(*subs), eval_p30(*subs), eval_p31(*subs))
+#     p2r_point = (eval_p17(*subs), eval_p18(*subs), eval_p19(*subs))
+#     p4r_point = (eval_p29(*subs), eval_p30(*subs), eval_p31(*subs))
     
-    p2f_point = (eval_p20(*subs), eval_p21(*subs), eval_p22(*subs))
-    p4f_point = (eval_p32(*subs), eval_p33(*subs), eval_p34(*subs))
+#     p2f_point = (eval_p20(*subs), eval_p21(*subs), eval_p22(*subs))
+#     p4f_point = (eval_p32(*subs), eval_p33(*subs), eval_p34(*subs))
+
 
     
-    return [(Cr_point, S_point, Q_point, Cf_point), 
-            (p1r_point, p3r_point), (p1f_point, p3f_point),
-            (p2r_point, p4r_point), (p2f_point, p4f_point)]
+#     return [(Cr_point, S_point, Q_point, Cf_point), 
+#             (p1r_point, p3r_point), (p1f_point, p3f_point),
+#             (p2r_point, p4r_point), (p2f_point, p4f_point)]
+
+
+# ---------------------------------------------------------------------------
+# Geometry helpers consistent with the new bike_model_perspective.py
+# ---------------------------------------------------------------------------
+
+def _build_frames(state, bike_parameters):
+    """
+    Rebuild the N, R, F reference frames for a given state.
+
+    state = (phi, theta, psi, delta, x_r, y_r, z_r)
+    bike_parameters = {'lr', 'lf1', 'lf2', 'rr', 'rf'}
+    """
+    phi, theta, psi, delta = state[0], state[1], state[2], state[3]
+
+    N, R, F = sp.symbols('N R F', cls=me.ReferenceFrame)
+    # Same orientation convention as in bike_model_perspective.py
+    R.orient_body_fixed(N, (psi, phi, theta), 'ZXY')
+    F.orient_axis(R, delta, R.z)
+    return N, R, F
+
+
+def _wheel_plane_axes(frame, world_frame):
+    """
+    Return the two unit vectors (horizontal, vertical) that span the
+    wheel plane, expressed in the world frame.
+
+    In bike_model_perspective.py the wheel plane is spanned by:
+        u_ver = cross(R.y, u_hor)
+        u_hor = cross(R.y, cross(R.y, N.x)).normalize()
+    (and analogously for F).
+    """
+    y_axis = frame.y
+    u_hor = me.cross(y_axis, me.cross(y_axis, world_frame.x)).normalize()
+    u_ver = me.cross(y_axis, u_hor)
+    return u_hor, u_ver
+
+
+def _to_xyz(vec, world_frame):
+    """
+    Convert a SymPy vector expressed in the world frame into a 3-tuple of
+    floats (x, y, z).
+    """
+    return (
+        float(vec.dot(world_frame.x)),
+        float(vec.dot(world_frame.y)),
+        float(vec.dot(world_frame.z)),
+    )
+
+
+def points2plot(bike_parameters: dict, state):
+    """
+    Compute the 3D positions (in the world frame N) of every point of
+    interest of the bicycle model, for the *new* perspective model.
+
+    Parameters
+    ----------
+    bike_parameters : dict
+        Must contain 'lr', 'lf1', 'lf2', 'rr', 'rf'.
+    state : array-like, shape (7,)
+        (phi, theta, psi, delta, x_r, y_r, z_r)
+
+    Returns
+    -------
+    frame_points : tuple
+        (Cr_point, S_point, Q_point, Cf_point)  – each a 3-tuple (x, y, z)
+    rw_points : tuple
+        (p1r_point, p3r_point)
+    fw_points : tuple
+        (p1f_point, p3f_point)
+    r_pts_2 : tuple
+        (p2r_point, p4r_point)
+    f_pts_2 : tuple
+        (p2f_point, p4f_point)
+
+    This signature matches the old points2plot, so plot_mbd_model_2d,
+    plot_mbd_model_3d and the interactive viewer keep working unchanged.
+    """
+    # Numeric state
+    phi, theta, psi, delta, x_r, y_r, z_r = (float(v) for v in state[:7])
+    lr  = float(bike_parameters['lr'])
+    lf1 = float(bike_parameters['lf1'])
+    lf2 = float(bike_parameters['lf2'])
+    rr  = float(bike_parameters['rr'])
+    rf  = float(bike_parameters['rf'])
+
+    # --- Build frames for this state -------------------------------------
+    N, R, F = _build_frames((phi, theta, psi, delta, x_r, y_r, z_r),
+                            bike_parameters)
+
+    # --- Points (positions expressed in the world frame N) ---------------
+    Cr = me.Point('Cr')
+    S  = me.Point('S')
+    Q  = me.Point('Q')
+    Cf = me.Point('Cf')
+
+    O = me.Point('O')
+    O.set_pos(O, 0)
+
+    Cr.set_pos(O,  x_r * N.x + y_r * N.y + z_r * N.z)
+    S.set_pos(Cr, lr * R.x)
+    Q.set_pos(S,  lf1 * -F.z)
+    Cf.set_pos(Q, lf2 * F.x)
+
+    # --- Wheel contact points on the rims --------------------------------
+    u_hor_r, u_ver_r = _wheel_plane_axes(R, N)
+    u_hor_f, u_ver_f = _wheel_plane_axes(F, N)
+
+    P1r = me.Point('P1r'); P1r.set_pos(Cr,  rr * u_ver_r)
+    P2r = me.Point('P2r'); P2r.set_pos(Cr,  rr * u_hor_r)
+    P3r = me.Point('P3r'); P3r.set_pos(Cr, -rr * u_ver_r)
+    P4r = me.Point('P4r'); P4r.set_pos(Cr, -rr * u_hor_r)
+
+    P1f = me.Point('P1f'); P1f.set_pos(Cf,  rf * u_ver_f)
+    P2f = me.Point('P2f'); P2f.set_pos(Cf,  rf * u_hor_f)
+    P3f = me.Point('P3f'); P3f.set_pos(Cf, -rf * u_ver_f)
+    P4f = me.Point('P4f'); P4f.set_pos(Cf, -rf * u_hor_f)
+
+    # --- Convert everything to (x, y, z) tuples in N ---------------------
+    Cr_point = _to_xyz(Cr.pos_from(O), N)
+    S_point  = _to_xyz(S.pos_from(O),  N)
+    Q_point  = _to_xyz(Q.pos_from(O),  N)
+    Cf_point = _to_xyz(Cf.pos_from(O), N)
+
+    p1r_point = _to_xyz(P1r.pos_from(O), N)
+    p3r_point = _to_xyz(P3r.pos_from(O), N)
+    p2r_point = _to_xyz(P2r.pos_from(O), N)
+    p4r_point = _to_xyz(P4r.pos_from(O), N)
+
+    p1f_point = _to_xyz(P1f.pos_from(O), N)
+    p3f_point = _to_xyz(P3f.pos_from(O), N)
+    p2f_point = _to_xyz(P2f.pos_from(O), N)
+    p4f_point = _to_xyz(P4f.pos_from(O), N)
+
+    return (
+        (Cr_point, S_point, Q_point, Cf_point),
+        (p1r_point, p3r_point),
+        (p1f_point, p3f_point),
+        (p2r_point, p4r_point),
+        (p2f_point, p4f_point),
+    )
+
 
 
 def pt2circle(p1, p2, p3, p4):
