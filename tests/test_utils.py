@@ -80,16 +80,15 @@ ELLIPSES = [(900, 500, 200, 80, 0.5), (900, 500, 200, 80, -0.9),
 
 
 @pytest.mark.parametrize("e", ELLIPSES)
-@pytest.mark.parametrize("direction", ["right", "left"])
-def test_find_points_lie_on_ellipse(e, direction):
-    for p in utils.find_points(e, direction):
+def test_find_points_lie_on_ellipse(e):
+    for p in utils.find_points(e):
         assert implicit(p, e) == pytest.approx(1.0, abs=1e-6)
 
 
 @pytest.mark.parametrize("e", ELLIPSES)
 def test_find_points_p1_top_p3_bottom_symmetric(e):
     x, z, a, b, th = e
-    p1, p2, p3, p4, *_ = utils.find_points(e, "right")
+    p1, p2, p3, p4, *_ = utils.find_points(e)
     d_z = np.sqrt(a**2 * np.sin(th)**2 + b**2 * np.cos(th)**2)
     assert p1[1] == pytest.approx(z + d_z)
     assert p3[1] == pytest.approx(z - d_z)
@@ -99,8 +98,8 @@ def test_find_points_p1_top_p3_bottom_symmetric(e):
 
 @pytest.mark.parametrize("e", ELLIPSES)
 def test_find_points_direction_swaps_p2_p4(e):
-    r = utils.find_points(e, "right")
-    l = utils.find_points(e, "left")
+    r = utils.find_points(e)
+    l = utils.find_points(e)
     assert r[1] == pytest.approx(l[3]) and r[3] == pytest.approx(l[1])
     assert r[0] == pytest.approx(l[0]) and r[2] == pytest.approx(l[2])
     assert r[1][0] < e[0] < r[3][0]          # 'right': p2 left of centre
@@ -174,7 +173,7 @@ def _tracking_with_extremes(n=3):
     for k in range(n):
         rear.append((600 + 10 * k, 500, 150, 120, 0.1))
         front.append((1200 + 10 * k, 520, 150, 130, 0.0))
-    ext = lambda es: [utils.find_points(e, "right") for e in es]
+    ext = lambda es: [utils.find_points(e) for e in es]
     return {0: {"ellipses": front, "extremes": ext(front)},
             1: {"ellipses": rear, "extremes": ext(rear)}}
 

@@ -817,7 +817,6 @@ def points2plot(bike_parameters: dict, state):
     )
 
 
-
 def pt2circle(p1, p2, p3, p4):
     pts = np.array([
         [p1[0], p1[1], p1[2]],
