@@ -755,7 +755,6 @@ def test_make_test_subs_length():
     assert len(subs) == len(variables)
 
 
-
 def visualize_square_projection():
 
     x_t2, y_t2, z_t2, ls = sp.symbols('x_t2, y_t2, z_t2, ls')

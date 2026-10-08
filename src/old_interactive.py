@@ -16,6 +16,13 @@ from utils import (
 class BikeInteractiveViewer:
     """
     Interactive 3D visualization of the bicycle multibody model.
+
+    Features
+    --------
+    * Sliders for the 7 state variables (phi, theta, psi, delta, x_r, y_r, z_r)
+    * Buttons to reset / re-run the least-squares fit from the current slider state
+    * Overlay of raw image points (projected to 3D using the assumed camera)
+    * Overlay of fitted ellipses (as 3D circles on the wheel planes)
     """
 
     STATE_LABELS = [
@@ -35,14 +42,15 @@ class BikeInteractiveViewer:
         self.bike_params = bike_params
         self.camera_params = camera_params
         self.state = np.array(state0, dtype=float)
-        self.image_points = image_points
-        self.ellipses = ellipses
+        self.image_points = image_points          # dict {0: front pts, 1: rear pts}
+        self.ellipses = ellipses                  # dict {0: (xf,zf,af,bf,thf), 1: ...}
         self.screen_resolution = screen_resolution
 
-        # Back-project image points onto the ground plane z=0
+        # Back-project image points onto the ground plane z=0 in camera frame
         self._init_geometry(focal_length, sensor_size, image_resolution)
 
         # ----- Figure / axes -----
+        # IMPORTANT: self.fig must exist before self.ax is created.
         self.fig = plt.figure(figsize=(15, 8))
 
         self.ax = self.fig.add_axes([0.32, 0.05, 0.66, 0.90], projection='3d')
@@ -52,26 +60,20 @@ class BikeInteractiveViewer:
         self.ax.set_title('Bicycle model – drag the sliders to change the state')
         self.ax.set_box_aspect([1, 1, 1])
 
-        # Fixed camera angle for the 3D view (set once, never touched again)
-        self.ax.view_init(elev=18, azim=-90)
-
         # Registry of artists that must be removed on each redraw
         self._artists = []
-        self._axes_initialised = False
 
         # ----- Sliders -----
         self.sliders = []
         self.slider_axs = []
         n = len(self.STATE_LABELS)
-        bottom = 0.35
+        top, bottom = 0.95, 0.35
         h = 0.03
         gap = 0.012
         for i, (key, label, lo, hi) in enumerate(self.STATE_LABELS):
-            ax_s = self.fig.add_axes([0.05, bottom + (n - 1 - i) * (h + gap),
-                                      0.20, h])
-            init_val = (np.rad2deg(self.state[i])
-                        if key in ('phi', 'theta', 'psi', 'delta')
-                        else self.state[i])
+            ax_s = self.fig.add_axes([0.05, bottom + (n - 1 - i) * (h + gap), 0.20, h])
+            init_val = np.rad2deg(self.state[i]) if key in ('phi', 'theta', 'psi', 'delta') \
+                else self.state[i]
             s = Slider(ax_s, label, lo, hi, valinit=init_val)
             s.on_changed(self._on_slider_change)
             self.sliders.append(s)
@@ -90,7 +92,7 @@ class BikeInteractiveViewer:
         self.btn_copy = Button(ax_copy, 'Copy state to clipboard')
         self.btn_copy.on_clicked(self._on_copy)
 
-        # ----- Radio -----
+        # ----- Radio for which points to show -----
         ax_radio = self.fig.add_axes([0.05, 0.05, 0.20, 0.12])
         self.radio = RadioButtons(ax_radio, ('front', 'rear', 'both'),
                                   active=2)
@@ -104,6 +106,10 @@ class BikeInteractiveViewer:
     # Geometry helpers
     # ------------------------------------------------------------------ #
     def _init_geometry(self, focal_length, sensor_size, image_resolution):
+        """
+        Build the camera ray directions (in the world frame) for every pixel
+        so that raw image points can be shown as 3D points on the ground plane.
+        """
         fx = focal_length * image_resolution[0] / sensor_size[0]
         fy = focal_length * image_resolution[1] / sensor_size[1]
         cx = image_resolution[0] / 2.0
@@ -112,9 +118,10 @@ class BikeInteractiveViewer:
                            [0, fy, cy],
                            [0, 0, 1]])
 
-        cy_, cp_, cr_ = (self.camera_params['cam_yaw'],
-                         self.camera_params['cam_pitch'],
-                         self.camera_params['cam_roll'])
+        # Camera rotation: ZYX Euler (yaw, pitch, roll)
+        cy_, cp_, cr_ = self.camera_params['cam_yaw'], \
+                        self.camera_params['cam_pitch'], \
+                        self.camera_params['cam_roll']
         Rz = np.array([[np.cos(cy_), -np.sin(cy_), 0],
                        [np.sin(cy_),  np.cos(cy_), 0],
                        [0, 0, 1]])
@@ -130,11 +137,36 @@ class BikeInteractiveViewer:
                                  self.camera_params['cam_y'],
                                  self.camera_params['cam_z']])
 
+
+    def _pixel_to_world_on_ground(self, u, v, ground_z=0.0):
+        """
+        Back-project a pixel (u, v) onto the horizontal plane z = ground_z
+        in the world frame.
+
+        Camera convention (from bike_model_perspective):
+            C.x -> right, C.y -> depth, C.z -> up
+        World convention: N.x forward, N.y left, N.z up
+        """
+        # Ray direction in camera frame (normalised later)
+        d_cam = np.linalg.inv(self.K) @ np.array([u, v, 1.0])
+        # Camera axes in world frame: columns of R_cam
+        # Camera frame x,y,z -> world
+        d_world = self.R_cam @ d_cam
+
+        # Intersect ray  P + t*d  with plane z = ground_z
+        denom = d_world[2]
+        if abs(denom) < 1e-9:
+            return None
+        t = (ground_z - self.cam_pos[2]) / denom
+        if t <= 0:
+            return None
+        return self.cam_pos + t * d_world
+
     # ------------------------------------------------------------------ #
     # Drawing
     # ------------------------------------------------------------------ #
     def _draw(self):
-        # ---- Remove previous artists -------------------------------------
+        # ---- Remove artists from the previous frame -----------------------
         for art in self._artists:
             try:
                 art.remove()
@@ -142,89 +174,69 @@ class BikeInteractiveViewer:
                 pass
         self._artists = []
 
-        # ---- Model --------------------------------------------------------
+        # ---- Model (current state) ---------------------------------------
+        # plot_mbd_model_3d returns the axes but creates lines/scatters on it.
+        # We snapshot the artists *before* and *after* the call to know what
+        # was added.
         before = set(id(a) for a in (self.ax.lines
                                      + self.ax.collections
                                      + self.ax.patches))
         plot_mbd_model_3d(self.bike_params, self.state, 'solver', ax=self.ax)
         self._collect_new_artists(before)
 
-        # ---- Raw image points --------------------------------------------
+        # ---- Raw image points projected to ground plane z = 0 ------------
         if self.image_points is not None:
-            self._draw_image_points()
+            sr = self.screen_resolution
+            for cid, pts in self.image_points.items():
+                u = pts[:, 0] * sr[0]
+                v = (1.0 - pts[:, 1]) * sr[1]
 
-        # ---- Fitted wheel circles ----------------------------------------
+                fx_s = self.camera_params['fx'] * (sr[0] / (self.K[0, 2] * 2))
+                fy_s = self.camera_params['fy'] * (sr[1] / (self.K[1, 2] * 2))
+                cx_s, cy_s = sr[0] / 2.0, sr[1] / 2.0
+                K_s = np.array([[fx_s, 0, cx_s],
+                                [0, fy_s, cy_s],
+                                [0, 0, 1]])
+                invK = np.linalg.inv(K_s)
+
+                world_pts = []
+                for ui, vi in zip(u, v):
+                    d_cam = invK @ np.array([ui, vi, 1.0])
+                    d_world = self.R_cam @ d_cam
+                    denom = d_world[2]
+                    if abs(denom) < 1e-9:
+                        continue
+                    t = (0.0 - self.cam_pos[2]) / denom
+                    if t <= 0:
+                        continue
+                    world_pts.append(self.cam_pos + t * d_world)
+
+                if len(world_pts):
+                    wp = np.array(world_pts)
+                    color = 'red' if cid == 0 else 'blue'
+                    sc = self.ax.scatter(wp[:, 0], wp[:, 1], wp[:, 2],
+                                         c=color, s=2, alpha=0.5)
+                    self._artists.append(sc)
+
+        # ---- Fitted ellipses as 3D circles on the wheel planes -----------
         if self.ellipses is not None:
-            self._draw_ellipse_circles()
+            self._draw_ellipse_circles()   # appends to self._artists itself
 
-        # ---- Axes: set ONCE, then freeze --------------------------------
-        if not self._axes_initialised:
-            self._set_fixed_axes()
-            self._axes_initialised = True
+        # ---- Equal axes ---------------------------------------------------
+        # Compute limits from the *current* data. Because ax.clear() is not
+        # used, the limits will keep growing unless we reset them first.
+        self.ax.set_xlim3d(0, 1)
+        self.ax.set_ylim3d(0, 1)
+        self.ax.set_zlim3d(0, 1)
+        self.ax.autoscale_view()
+        set_axes_equal(self.ax)
+
+        # Keep a stable camera angle; set_box_aspect already handles scale.
+        # Comment out the next line if you want free rotation between redraws.
+        # self.ax.view_init(elev=15, azim=-90)
 
         self.fig.canvas.draw_idle()
 
-    def _set_fixed_axes(self, margin=0.5):
-        """
-        Compute a 1:1:1 bounding box from the bike geometry at the current
-        state and freeze the axes limits. Called only once.
-        """
-        try:
-            frame_pts, rw_pts, fw_pts, r2, f2 = points2plot(self.bike_params,
-                                                            self.state)
-        except Exception as e:
-            print(f"[interactive] points2plot failed for axes: {e}")
-            self.ax.set_xlim3d(-2, 2)
-            self.ax.set_ylim3d(-2, 2)
-            self.ax.set_zlim3d( 0, 2)
-            return
-
-        all_pts = list(frame_pts) + list(rw_pts) + list(fw_pts) \
-                  + list(r2) + list(f2)
-        pts = np.array(all_pts, dtype=float)
-
-        mins = pts.min(axis=0)
-        maxs = pts.max(axis=0)
-        center = 0.5 * (mins + maxs)
-        half   = 0.5 * np.max(maxs - mins)
-        half   = max(half, 0.5) + margin
-
-        self.ax.set_xlim3d(center[0] - half, center[0] + half)
-        self.ax.set_ylim3d(center[1] - half, center[1] + half)
-        self.ax.set_zlim3d(center[2] - half, center[2] + half)
-
-    def _draw_image_points(self):
-        sr = self.screen_resolution
-        for cid, pts in self.image_points.items():
-            u = pts[:, 0] * sr[0]
-            v = (1.0 - pts[:, 1]) * sr[1]
-
-            fx_s = self.camera_params['fx'] * (sr[0] / (self.K[0, 2] * 2))
-            fy_s = self.camera_params['fy'] * (sr[1] / (self.K[1, 2] * 2))
-            cx_s, cy_s = sr[0] / 2.0, sr[1] / 2.0
-            K_s = np.array([[fx_s, 0, cx_s],
-                            [0, fy_s, cy_s],
-                            [0, 0, 1]])
-            invK = np.linalg.inv(K_s)
-
-            world_pts = []
-            for ui, vi in zip(u, v):
-                d_cam = invK @ np.array([ui, vi, 1.0])
-                d_world = self.R_cam @ d_cam
-                denom = d_world[2]
-                if abs(denom) < 1e-9:
-                    continue
-                t = (0.0 - self.cam_pos[2]) / denom
-                if t <= 0:
-                    continue
-                world_pts.append(self.cam_pos + t * d_world)
-
-            if len(world_pts):
-                wp = np.array(world_pts)
-                color = 'red' if cid == 0 else 'blue'
-                sc = self.ax.scatter(wp[:, 0], wp[:, 1], wp[:, 2],
-                                     c=color, s=2, alpha=0.5)
-                self._artists.append(sc)
 
     def _draw_ellipse_circles(self):
         try:
@@ -246,18 +258,7 @@ class BikeInteractiveViewer:
             self._artists.append(l_r)
             self._artists.append(l_f)
         except Exception as e:
-            print(f"[interactive] Could not draw ellipse circles: {e}")
-
-    def _collect_new_artists(self, before_ids):
-        for coll in self.ax.collections:
-            if id(coll) not in before_ids:
-                self._artists.append(coll)
-        for line in self.ax.lines:
-            if id(line) not in before_ids:
-                self._artists.append(line)
-        for patch in self.ax.patches:
-            if id(patch) not in before_ids:
-                self._artists.append(patch)
+            print(f"[interactive_viz] Could not draw ellipse circles: {e}")
 
     # ------------------------------------------------------------------ #
     # Callbacks
@@ -270,8 +271,11 @@ class BikeInteractiveViewer:
             self.state[i] = v
         self._draw()
 
+
     def _on_reset(self, _):
+        # Reset to whatever the sliders currently show (no-op)
         self._on_slider_change(None)
+
 
     def _on_copy(self, _):
         txt = (f"phi={self.state[0]:.6f}, theta={self.state[1]:.6f}, "
@@ -286,16 +290,23 @@ class BikeInteractiveViewer:
             print("State (pyperclip unavailable):")
         print(txt)
 
+
     def _on_radio(self, label):
         self._draw()
 
+
     def _on_fit(self, _):
+        """
+        Run a least-squares fit from the current slider state and update
+        the sliders to the solution.
+        """
         from scipy.optimize import least_squares
 
         if self.image_points is None:
             print("No image data available for fitting.")
             return
 
+        # Build the data dictionary expected by the model
         data = self._build_model_data()
         if data is None:
             return
@@ -312,6 +323,7 @@ class BikeInteractiveViewer:
                 max_nfev=200,
             )
             self.state = res.x
+            # Update sliders
             for i, s in enumerate(self.sliders):
                 v = self.state[i]
                 if i < 4:
@@ -323,10 +335,13 @@ class BikeInteractiveViewer:
 
         self._draw()
 
+
     def _build_model_data(self):
-        if (self.image_points is None
-                or 0 not in self.image_points
-                or 1 not in self.image_points):
+        """
+        Build the dict of image measurements required by perpro.residual_eqs
+        from the raw points stored in self.image_points.
+        """
+        if self.image_points is None or 0 not in self.image_points or 1 not in self.image_points:
             print("Need both front (0) and rear (1) point sets.")
             return None
 
@@ -334,6 +349,7 @@ class BikeInteractiveViewer:
         front = self.image_points[0]
         rear = self.image_points[1]
 
+        # Fit ellipses to get centres and angles
         ef = fitEllipse(front, sr)
         er = fitEllipse(rear, sr)
         if ef is None or er is None:
@@ -348,6 +364,7 @@ class BikeInteractiveViewer:
         ang_f = np.arccos(bf / af) if af > bf else 0.0
         ang_r = np.arccos(br / ar) if ar > br else 0.0
 
+        # Q–S direction (same formula used in main.py)
         denom_f = np.sqrt(
             (np.sin(ang_f) * np.cos(ang_r)
              - np.sin(ang_r) * np.cos(ang_f) * np.cos(thf - thr)) ** 2
@@ -365,10 +382,10 @@ class BikeInteractiveViewer:
                  * np.sin(thf - thr) * np.cos(ang_f))
 
         return {
-            'r_Cf_Cr_u':  np.array([xf - xr]),
-            'r_Cf_Cr_v':  np.array([zf - zr]),
-            'u_Cr':       np.array([xr]),
-            'v_Cr':       np.array([zr]),
+            'r_Cf_Cr_u': np.array([xf - xr]),
+            'r_Cf_Cr_v': np.array([zf - zr]),
+            'u_Cr': np.array([xr]),
+            'v_Cr': np.array([zr]),
             'r_P1r_Cr_u': np.array([p1r[0] - xr]),
             'r_P1r_Cr_v': np.array([p1r[1] - zr]),
             'r_P3r_Cr_u': np.array([p3r[0] - xr]),
@@ -377,10 +394,22 @@ class BikeInteractiveViewer:
             'r_P1f_Cf_v': np.array([p1f[1] - zf]),
             'r_P3f_Cf_u': np.array([p3f[0] - xf]),
             'r_P3f_Cf_v': np.array([p3f[1] - zf]),
-            'r_Q_S_u':    np.array([num_u / denom_f]),
-            'r_Q_S_v':    np.array([num_v / denom_f]),
+            'r_Q_S_u': np.array([num_u / denom_f]),
+            'r_Q_S_v': np.array([num_v / denom_f]),
         }
 
+
+    def _collect_new_artists(self, before_ids):
+        """Track artists added to self.ax since the `before_ids` snapshot."""
+        for coll in self.ax.collections:
+            if id(coll) not in before_ids:
+                self._artists.append(coll)
+        for line in self.ax.lines:
+            if id(line) not in before_ids:
+                self._artists.append(line)
+        for patch in self.ax.patches:
+            if id(patch) not in before_ids:
+                self._artists.append(patch)
 
 # ---------------------------------------------------------------------- #
 # Convenience launcher
@@ -396,5 +425,6 @@ def launch_interactive(bike_params, camera_params, state0,
         ellipses=ellipses,
         screen_resolution=screen_resolution,
     )
+    
     plt.show()
     return viewer

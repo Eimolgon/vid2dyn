@@ -13,7 +13,9 @@ from matplotlib.patches import Ellipse
 from scipy.optimize import least_squares
 # from bike_model import *
 from skimage.draw import ellipse_perimeter
+# from interactive import launch_interactive
 from interactive import launch_interactive
+from interactive_camera import launch_camera_view
 
 
 from utils import (
@@ -329,12 +331,22 @@ if args.single_frame != 0 :
 
 
     if args.plot == 'interactive':
-        viewer = launch_interactive(
+        # 3D viewer with state sliders
+        viewer3d = launch_interactive(
             bike_params=bike_params,
             camera_params=camera_params,
-            state0=x0,                                  # your initial guess
-            image_points={0: front_data, 1: rear_data}, # (N,2) normalised points
+            state0=x0,
+            image_points={0: front_data, 1: rear_data},
             ellipses={0: ellipse_front, 1: ellipse_rear},
+            screen_resolution=screen_resolution,
+        )
+
+        # Separate 2D projection viewer with camera sliders
+        viewer2d = launch_camera_view(
+            bike_params=bike_params,
+            camera_params=camera_params,
+            state=x0,                # or viewer3d.state, or the fitted state
+            image_points={0: front_data, 1: rear_data},
             screen_resolution=screen_resolution,
         )
 
