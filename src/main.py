@@ -16,6 +16,7 @@ from skimage.draw import ellipse_perimeter
 # from interactive import launch_interactive
 from interactive import launch_interactive
 from interactive_camera import launch_camera_view
+from interactive_viewer import launch_interactive_viewer
 
 
 from utils import (
@@ -121,11 +122,24 @@ boundaries = (lower_bound, upper_bound)
 #                  'cx': screen_resolution[0]*0.5, 
 #                  'cy': screen_resolution[1]*0.5}
 
+# camera_params = {
+#         'fx': focal_length * image_resolution[0] / sensor_size[0],
+#         'fy': focal_length * image_resolution[1] / sensor_size[1],
+#         'cx': image_resolution[0] / 2,
+#         'cy': image_resolution[1] / 2,
+#         'cam_x': 0.0,
+#         'cam_y': 0.0,
+#         'cam_z': 0.45,
+#         'cam_yaw': 0.0,
+#         'cam_pitch': 0.0,
+#         'cam_roll': 0.0
+#     }
+
 camera_params = {
-        'fx': focal_length * image_resolution[0] / sensor_size[0],
-        'fy': focal_length * image_resolution[1] / sensor_size[1],
-        'cx': image_resolution[0] / 2,
-        'cy': image_resolution[1] / 2,
+        'fx': focal_length * screen_resolution[0] / sensor_size[0],
+        'fy': focal_length * screen_resolution[1] / sensor_size[1],
+        'cx': screen_resolution[0] / 2,
+        'cy': screen_resolution[1] / 2,
         'cam_x': 0.0,
         'cam_y': 0.0,
         'cam_z': 0.45,
@@ -332,22 +346,31 @@ if args.single_frame != 0 :
 
     if args.plot == 'interactive':
         # 3D viewer with state sliders
-        viewer3d = launch_interactive(
+        # viewer3d = launch_interactive(
+        #     bike_params=bike_params,
+        #     camera_params=camera_params,
+        #     state0=x0,
+        #     image_points={0: front_data, 1: rear_data},
+        #     ellipses={0: ellipse_front, 1: ellipse_rear},
+        #     screen_resolution=screen_resolution,
+        # )
+
+        # # Separate 2D projection viewer with camera sliders
+        # viewer2d = launch_camera_view(
+        #     bike_params=bike_params,
+        #     camera_params=camera_params,
+        #     state=x0,                # or viewer3d.state, or the fitted state
+        #     image_points={0: front_data, 1: rear_data},
+        #     screen_resolution=screen_resolution,
+        # )
+
+        launch_interactive_viewer(
             bike_params=bike_params,
             camera_params=camera_params,
             state0=x0,
             image_points={0: front_data, 1: rear_data},
             ellipses={0: ellipse_front, 1: ellipse_rear},
-            screen_resolution=screen_resolution,
-        )
-
-        # Separate 2D projection viewer with camera sliders
-        viewer2d = launch_camera_view(
-            bike_params=bike_params,
-            camera_params=camera_params,
-            state=x0,                # or viewer3d.state, or the fitted state
-            image_points={0: front_data, 1: rear_data},
-            screen_resolution=screen_resolution,
+            screen_resolution=screen_resolution
         )
 
     elif args.plot == 'e':
