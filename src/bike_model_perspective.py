@@ -29,11 +29,11 @@ def residual_eqs(x, data, bike_params, camera_params):
     f10 = eval_f10(*subs) - data['r_P1f_Cf_v']
     f11 = eval_f11(*subs) - data['r_P3f_Cf_u']
     f12 = eval_f12(*subs) - data['r_P3f_Cf_v']
-    f13 = eval_f13(*subs) - data['r_Q_S_u']
-    f14 = eval_f14(*subs) - data['r_Q_S_v']
+    # f13 = eval_f13(*subs) - data['r_Q_S_u']
+    # f14 = eval_f14(*subs) - data['r_Q_S_v']
 
     return np.array([f01, f02, f03, f04, f05, f06, f07, 
-                     f08, f09, f10, f11, f12, f13, f14])
+                     f08, f09, f10, f11, f12])
 
 def perspective_projection(point, camera_center, camera_frame,
                            fx, fy, cx, cy):
@@ -177,8 +177,8 @@ r_Cf_Cr_v = v_Cf - v_Cr
 # r_Q_S_u = (u_Q - u_S).normalize()
 # r_Q_S_v = (v_Q - v_S).normalize()
 
-r_Q_S_u = (u_Q - u_S)
-r_Q_S_v = (v_Q - v_S)
+# r_Q_S_u = (u_Q - u_S)
+# r_Q_S_v = (v_Q - v_S)
 
 r_P1r_Cr_u = u_P1r - u_Cr
 r_P1r_Cr_v = v_P1r - v_Cr
@@ -214,5 +214,5 @@ eval_f10 = sp.lambdify(variables, r_P1f_Cf_v)
 eval_f11 = sp.lambdify(variables, r_P3f_Cf_u)
 eval_f12 = sp.lambdify(variables, r_P3f_Cf_v)
 
-eval_f13 = sp.lambdify(variables, r_Q_S_u)
-eval_f14 = sp.lambdify(variables, r_Q_S_v)
+# eval_f13 = sp.lambdify(variables, r_Q_S_u)
+# eval_f14 = sp.lambdify(variables, r_Q_S_v)

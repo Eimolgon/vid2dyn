@@ -245,26 +245,6 @@ if args.single_frame != 0 :
         angle_ellipse_r = 0
 
 
-    # ----- This is just another test ----- 
-    # aff,bff,cff,dff,eff,fff = fitEllipse_conic(front_data, screen_resolution)
-    # normal_f = get_normal(aff,bff,cff,dff,eff,fff)
-
-    # arr, brr, crr, drr, err, frr = fitEllipse_conic(rear_data, screen_resolution)
-    # normal_r = get_normal(arr, brr, crr, drr, err, frr)
-
-    # print(f'normal front: {normal_f}')
-    # new_angle2camera_f = normal_f/np.linalg.norm(normal_f)
-
-    # print(f'normal rear: {normal_r}')
-    # new_angle2camera_r = normal_r/np.linalg.norm(normal_r)
-    
-    # print(f'old angle f: {np.rad2deg(angle_ellipse_f):.2f}')
-    # print(f'new angle f: {np.rad2deg(new_angle2camera_f[1]):.2f}')
-
-    # print(f'old angle r: {np.rad2deg(angle_ellipse_r):.2f}')
-    # print(f'new angle r: {np.rad2deg(new_angle2camera_r[1]):.2f}')
-
-    # ----- ----- ----- ----- -----
 
     # Find extreme points of the ellipses
     p1_f, p2_f, p3_f, p4_f = find_points(ellipse_front)
@@ -275,59 +255,73 @@ if args.single_frame != 0 :
     plot_points_r = (xr, zr, p1_r, p3_r)
 
     imgdata = {
-        'r_Cf_Cr_u' : [xf - xr],
-        'r_Cf_Cr_v' : [zf - zr],
-        'u_Cr' : [xr],
-        'v_Cr' : [zr],
-        'r_P1r_Cr_u' : [p1_r[0] - xr],
-        'r_P1r_Cr_v' : [p1_r[1] - zr],
-        'r_P3r_Cr_u' : [p3_r[0] - xr],
-        'r_P3r_Cr_v' : [p3_r[1] - zr],
-        'r_P1f_Cf_u' : [p1_f[0] - xf],
-        'r_P1f_Cf_v' : [p1_f[1] - zf],
-        'r_P3f_Cf_u' : [p3_f[0] - xf],
-        'r_P3f_Cf_v' : [p3_f[1] - zf],
-        'r_Q_S_u' : [(np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) 
-                     - np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)
-                     * np.cos(theta_f - theta_r))*np.sin(theta_f)/ \
-                        np.sqrt((np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) 
-                                 - np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
-                                 np.cos(theta_f - theta_r))**2 + 
-                                 np.sin(angle_ellipse_r)**2*
-                                 np.sin(theta_f - theta_r)**2) + \
-                                    np.sin(angle_ellipse_r)*\
-                                        np.sin(theta_f - theta_r)*\
-                                            np.cos(angle_ellipse_f)*\
-                                                np.cos(theta_f)/ \
-                                                    np.sqrt((np.sin(angle_ellipse_f)*
-                                                             np.cos(angle_ellipse_r) - 
-                                                             np.sin(angle_ellipse_r)*
-                                                             np.cos(angle_ellipse_f)*
-                                                             np.cos(theta_f - theta_r))**2 + 
-                                                             np.sin(angle_ellipse_r)**2*
-                                                             np.sin(theta_f - theta_r)**2)],
-        'r_Q_S_v' : [(np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) - 
-                     np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
-                     np.cos(theta_f - theta_r))*np.cos(theta_f)/ \
-                        np.sqrt((np.sin(angle_ellipse_f)*
-                                 np.cos(angle_ellipse_r) - 
-                                 np.sin(angle_ellipse_r)*
-                                 np.cos(angle_ellipse_f)*
-                                 np.cos(theta_f - theta_r))**2 + 
-                                 np.sin(angle_ellipse_r)**2*
-                                 np.sin(theta_f - theta_r)**2) - \
-                                    np.sin(angle_ellipse_r)*np.sin(theta_f)* \
-                                        np.sin(theta_f - theta_r)* \
-                                            np.cos(angle_ellipse_f)/ \
-                                                np.sqrt((np.sin(angle_ellipse_f)*
-                                                         np.cos(angle_ellipse_r) - 
-                                                         np.sin(angle_ellipse_r)*
-                                                         np.cos(angle_ellipse_f)*
-                                                         np.cos(theta_f - theta_r))**2 + 
-                                                         np.sin(angle_ellipse_r)**2*
-                                                         np.sin(theta_f - theta_r)**2)]
+            'r_Cf_Cr_u' : [xf - xr],
+            'r_Cf_Cr_v' : [zf - zr],
+            'u_Cr' : [xr],
+            'v_Cr' : [zr],
+            'r_P1r_Cr_u' : [p1_r[0] - xr],
+            'r_P1r_Cr_v' : [p1_r[1] - zr],
+            'r_P3r_Cr_u' : [p3_r[0] - xr],
+            'r_P3r_Cr_v' : [p3_r[1] - zr],
+            'r_P1f_Cf_u' : [p1_f[0] - xf],
+            'r_P1f_Cf_v' : [p1_f[1] - zf],
+            'r_P3f_Cf_u' : [p3_f[0] - xf],
+            'r_P3f_Cf_v' : [p3_f[1] - zf],
+            }
+    # imgdata = {
+    #     'r_Cf_Cr_u' : [xf - xr],
+    #     'r_Cf_Cr_v' : [zf - zr],
+    #     'u_Cr' : [xr],
+    #     'v_Cr' : [zr],
+    #     'r_P1r_Cr_u' : [p1_r[0] - xr],
+    #     'r_P1r_Cr_v' : [p1_r[1] - zr],
+    #     'r_P3r_Cr_u' : [p3_r[0] - xr],
+    #     'r_P3r_Cr_v' : [p3_r[1] - zr],
+    #     'r_P1f_Cf_u' : [p1_f[0] - xf],
+    #     'r_P1f_Cf_v' : [p1_f[1] - zf],
+    #     'r_P3f_Cf_u' : [p3_f[0] - xf],
+    #     'r_P3f_Cf_v' : [p3_f[1] - zf],
+    #     'r_Q_S_u' : [(np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) 
+    #                  - np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)
+    #                  * np.cos(theta_f - theta_r))*np.sin(theta_f)/ \
+    #                     np.sqrt((np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) 
+    #                              - np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
+    #                              np.cos(theta_f - theta_r))**2 + 
+    #                              np.sin(angle_ellipse_r)**2*
+    #                              np.sin(theta_f - theta_r)**2) + \
+    #                                 np.sin(angle_ellipse_r)*\
+    #                                     np.sin(theta_f - theta_r)*\
+    #                                         np.cos(angle_ellipse_f)*\
+    #                                             np.cos(theta_f)/ \
+    #                                                 np.sqrt((np.sin(angle_ellipse_f)*
+    #                                                          np.cos(angle_ellipse_r) - 
+    #                                                          np.sin(angle_ellipse_r)*
+    #                                                          np.cos(angle_ellipse_f)*
+    #                                                          np.cos(theta_f - theta_r))**2 + 
+    #                                                          np.sin(angle_ellipse_r)**2*
+    #                                                          np.sin(theta_f - theta_r)**2)],
+    #     'r_Q_S_v' : [(np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) - 
+    #                  np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
+    #                  np.cos(theta_f - theta_r))*np.cos(theta_f)/ \
+    #                     np.sqrt((np.sin(angle_ellipse_f)*
+    #                              np.cos(angle_ellipse_r) - 
+    #                              np.sin(angle_ellipse_r)*
+    #                              np.cos(angle_ellipse_f)*
+    #                              np.cos(theta_f - theta_r))**2 + 
+    #                              np.sin(angle_ellipse_r)**2*
+    #                              np.sin(theta_f - theta_r)**2) - \
+    #                                 np.sin(angle_ellipse_r)*np.sin(theta_f)* \
+    #                                     np.sin(theta_f - theta_r)* \
+    #                                         np.cos(angle_ellipse_f)/ \
+    #                                             np.sqrt((np.sin(angle_ellipse_f)*
+    #                                                      np.cos(angle_ellipse_r) - 
+    #                                                      np.sin(angle_ellipse_r)*
+    #                                                      np.cos(angle_ellipse_f)*
+    #                                                      np.cos(theta_f - theta_r))**2 + 
+    #                                                      np.sin(angle_ellipse_r)**2*
+    #                                                      np.sin(theta_f - theta_r)**2)]
 
-    }
+    # }
 
     # Set wheel radii
     # bike_params['rf'] = af
@@ -345,24 +339,6 @@ if args.single_frame != 0 :
 
 
     if args.plot == 'interactive':
-        # 3D viewer with state sliders
-        # viewer3d = launch_interactive(
-        #     bike_params=bike_params,
-        #     camera_params=camera_params,
-        #     state0=x0,
-        #     image_points={0: front_data, 1: rear_data},
-        #     ellipses={0: ellipse_front, 1: ellipse_rear},
-        #     screen_resolution=screen_resolution,
-        # )
-
-        # # Separate 2D projection viewer with camera sliders
-        # viewer2d = launch_camera_view(
-        #     bike_params=bike_params,
-        #     camera_params=camera_params,
-        #     state=x0,                # or viewer3d.state, or the fitted state
-        #     image_points={0: front_data, 1: rear_data},
-        #     screen_resolution=screen_resolution,
-        # )
 
         launch_interactive_viewer(
             bike_params=bike_params,

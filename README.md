@@ -7,6 +7,12 @@ Ellipse2Data
 
 - [ellipse2data](ellipse2data.py)
 
+To run the viewer
+`python src/model_viewer.py`
+
+To run the viewer and a specific data frame
+`python src/model_viewer.py --label /path/to/data.txt`
+
 To run all the tests
 `pytest tests/ -v`
 
@@ -36,22 +42,12 @@ Example for data ellipse animation:
 To-Do
 -------
 
-- [x] Plot x distance
-- [x] Plot y distance
-- [x] Plot absolute distance
-- [x] Find ellipse extremes ([xd, yd], [xu, yu], [xl, yl], [xr, yr])
 - [ ] Test reconstruction accuracy
-- [x] More points == more accuracy?
-- [x] Check dependencies
 - [x] Argparse
     - [ ] Improve argparse plot: -p all, -p yaw, -p roll, etc.
     - [ ] Add -t for tests -t model -t ellipse, etc.
 - [ ] Fix filtered data processing
-- [x] Check ellipse animation https://stackoverflow.com/questions/78113285/time-control-bar-for-animation-in-matplotlib
-- [x] Check ellipse reconstruction
 - [ ] Use previous frames to estimate next state
-- [x] Add dashed line plot in 3d to show initial guess
-- [x] Add constraint for wheel size
 
 
 

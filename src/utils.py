@@ -5,8 +5,10 @@ import json
 import math
 import numpy as np
 import sympy as sp
+
 import matplotlib.pyplot as plt
 from collections import defaultdict
+import sympy.physics.mechanics as me
 from bike_model_perspective import *
 from matplotlib.patches import Ellipse
 import matplotlib.animation as animation
@@ -15,6 +17,7 @@ from skimage.measure import EllipseModel
 from scipy.optimize import least_squares
 from scipy.signal import butter, filtfilt
 from skimage.draw import ellipse_perimeter
+
 
 
 
@@ -443,21 +446,36 @@ def data4model(track_data, assumed_origin):
     '''
 
     data = {
-        'r_Cf_Cr_u':0,
-        'r_Cf_Cr_v':0,
-        'u_Cr':0,
-        'v_Cr':0,
-        'r_P1r_Cr_u':0,
-        'r_P1r_Cr_v':0,
-        'r_P3r_Cr_u':0,
-        'r_P3r_Cr_v':0,
-        'r_P1f_Cf_u':0,
-        'r_P1f_Cf_v':0,
-        'r_P3f_Cf_u':0,
-        'r_P3f_Cf_v':0,
-        'r_Q_S_u':0,
-        'r_Q_S_v':0
-    }
+            'r_Cf_Cr_u':0,
+            'r_Cf_Cr_v':0,
+            'u_Cr':0,
+            'v_Cr':0,
+            'r_P1r_Cr_u':0,
+            'r_P1r_Cr_v':0,
+            'r_P3r_Cr_u':0,
+            'r_P3r_Cr_v':0,
+            'r_P1f_Cf_u':0,
+            'r_P1f_Cf_v':0,
+            'r_P3f_Cf_u':0,
+            'r_P3f_Cf_v':0
+        }
+
+    # data = {
+    #     'r_Cf_Cr_u':0,
+    #     'r_Cf_Cr_v':0,
+    #     'u_Cr':0,
+    #     'v_Cr':0,
+    #     'r_P1r_Cr_u':0,
+    #     'r_P1r_Cr_v':0,
+    #     'r_P3r_Cr_u':0,
+    #     'r_P3r_Cr_v':0,
+    #     'r_P1f_Cf_u':0,
+    #     'r_P1f_Cf_v':0,
+    #     'r_P3f_Cf_u':0,
+    #     'r_P3f_Cf_v':0,
+    #     'r_Q_S_u':0,
+    #     'r_Q_S_v':0
+    # }
 
     rear_wheel = {
         'x': 0,
@@ -517,45 +535,45 @@ def data4model(track_data, assumed_origin):
     data['r_P1r_Cr_v'] = p1_r[:, 1] - zr
     data['r_P3r_Cr_u'] = p3_r[:, 0] - xr
     data['r_P3r_Cr_v'] = p3_r[:, 1] - zr
-    data['r_Q_S_u'] = (np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) - 
-                     np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
-                     np.cos(theta_f - theta_r))*np.sin(theta_f)/ \
-                        np.sqrt((np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) 
-                                 - np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
-                                 np.cos(theta_f - theta_r))**2 + 
-                                 np.sin(angle_ellipse_r)**2*
-                                 np.sin(theta_f - theta_r)**2) + \
-                                    np.sin(angle_ellipse_r)*\
-                                        np.sin(theta_f - theta_r)*\
-                                            np.cos(angle_ellipse_f)*\
-                                                np.cos(theta_f)/ \
-                                                    np.sqrt((np.sin(angle_ellipse_f)*
-                                                             np.cos(angle_ellipse_r) - 
-                                                             np.sin(angle_ellipse_r)*
-                                                             np.cos(angle_ellipse_f)*
-                                                             np.cos(theta_f - theta_r))**2 + 
-                                                             np.sin(angle_ellipse_r)**2*
-                                                             np.sin(theta_f - theta_r)**2)    
-    data['r_Q_S_v'] = (np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) - 
-                     np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
-                     np.cos(theta_f - theta_r))*np.cos(theta_f)/ \
-                        np.sqrt((np.sin(angle_ellipse_f)*
-                                 np.cos(angle_ellipse_r) - 
-                                 np.sin(angle_ellipse_r)*
-                                 np.cos(angle_ellipse_f)*
-                                 np.cos(theta_f - theta_r))**2 + 
-                                 np.sin(angle_ellipse_r)**2*
-                                 np.sin(theta_f - theta_r)**2) - \
-                                    np.sin(angle_ellipse_r)*np.sin(theta_f)* \
-                                        np.sin(theta_f - theta_r)* \
-                                            np.cos(angle_ellipse_f)/ \
-                                                np.sqrt((np.sin(angle_ellipse_f)*
-                                                         np.cos(angle_ellipse_r) - 
-                                                         np.sin(angle_ellipse_r)*
-                                                         np.cos(angle_ellipse_f)*
-                                                         np.cos(theta_f - theta_r))**2 + 
-                                                         np.sin(angle_ellipse_r)**2*
-                                                         np.sin(theta_f - theta_r)**2)
+    # data['r_Q_S_u'] = (np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) - 
+    #                  np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
+    #                  np.cos(theta_f - theta_r))*np.sin(theta_f)/ \
+    #                     np.sqrt((np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) 
+    #                              - np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
+    #                              np.cos(theta_f - theta_r))**2 + 
+    #                              np.sin(angle_ellipse_r)**2*
+    #                              np.sin(theta_f - theta_r)**2) + \
+    #                                 np.sin(angle_ellipse_r)*\
+    #                                     np.sin(theta_f - theta_r)*\
+    #                                         np.cos(angle_ellipse_f)*\
+    #                                             np.cos(theta_f)/ \
+    #                                                 np.sqrt((np.sin(angle_ellipse_f)*
+    #                                                          np.cos(angle_ellipse_r) - 
+    #                                                          np.sin(angle_ellipse_r)*
+    #                                                          np.cos(angle_ellipse_f)*
+    #                                                          np.cos(theta_f - theta_r))**2 + 
+    #                                                          np.sin(angle_ellipse_r)**2*
+    #                                                          np.sin(theta_f - theta_r)**2)    
+    # data['r_Q_S_v'] = (np.sin(angle_ellipse_f)*np.cos(angle_ellipse_r) - 
+    #                  np.sin(angle_ellipse_r)*np.cos(angle_ellipse_f)*
+    #                  np.cos(theta_f - theta_r))*np.cos(theta_f)/ \
+    #                     np.sqrt((np.sin(angle_ellipse_f)*
+    #                              np.cos(angle_ellipse_r) - 
+    #                              np.sin(angle_ellipse_r)*
+    #                              np.cos(angle_ellipse_f)*
+    #                              np.cos(theta_f - theta_r))**2 + 
+    #                              np.sin(angle_ellipse_r)**2*
+    #                              np.sin(theta_f - theta_r)**2) - \
+    #                                 np.sin(angle_ellipse_r)*np.sin(theta_f)* \
+    #                                     np.sin(theta_f - theta_r)* \
+    #                                         np.cos(angle_ellipse_f)/ \
+    #                                             np.sqrt((np.sin(angle_ellipse_f)*
+    #                                                      np.cos(angle_ellipse_r) - 
+    #                                                      np.sin(angle_ellipse_r)*
+    #                                                      np.cos(angle_ellipse_f)*
+    #                                                      np.cos(theta_f - theta_r))**2 + 
+    #                                                      np.sin(angle_ellipse_r)**2*
+    #                                                      np.sin(theta_f - theta_r)**2)
 
     data_json = clean4json(data)
     rw_json = clean4json(rear_wheel)
@@ -579,21 +597,35 @@ def fit_img2model(real_data, initial_guess, bike_parameters,
     lower_bound, upper_bound = boundaries
 
     image_data = {
-    'r_Cf_Cr_u': 0, 
-    'r_Cf_Cr_v': 0, 
-    'u_Cr': 0,
-    'v_Cr': 0,
-    'r_P1r_Cr_u': 0,
-    'r_P1r_Cr_v': 0,
-    'r_P3r_Cr_u': 0,
-    'r_P3r_Cr_v': 0,
-    'r_P1f_Cf_u': 0,
-    'r_P1f_Cf_v': 0,
-    'r_P3f_Cf_u': 0,
-    'r_P3f_Cf_v': 0,
-    'r_Q_S_u': 0,
-    'r_Q_S_v': 0
-    }
+        'r_Cf_Cr_u': 0, 
+        'r_Cf_Cr_v': 0, 
+        'u_Cr': 0,
+        'v_Cr': 0,
+        'r_P1r_Cr_u': 0,
+        'r_P1r_Cr_v': 0,
+        'r_P3r_Cr_u': 0,
+        'r_P3r_Cr_v': 0,
+        'r_P1f_Cf_u': 0,
+        'r_P1f_Cf_v': 0,
+        'r_P3f_Cf_u': 0,
+        'r_P3f_Cf_v': 0,
+        }
+    # image_data = {
+    # 'r_Cf_Cr_u': 0, 
+    # 'r_Cf_Cr_v': 0, 
+    # 'u_Cr': 0,
+    # 'v_Cr': 0,
+    # 'r_P1r_Cr_u': 0,
+    # 'r_P1r_Cr_v': 0,
+    # 'r_P3r_Cr_u': 0,
+    # 'r_P3r_Cr_v': 0,
+    # 'r_P1f_Cf_u': 0,
+    # 'r_P1f_Cf_v': 0,
+    # 'r_P3f_Cf_u': 0,
+    # 'r_P3f_Cf_v': 0,
+    # 'r_Q_S_u': 0,
+    # 'r_Q_S_v': 0
+    # }
 
     for i in range(len(real_data['r_Cf_Cr_u'])):
 
@@ -611,8 +643,8 @@ def fit_img2model(real_data, initial_guess, bike_parameters,
         image_data['r_P1f_Cf_v'] = real_data['r_P1f_Cf_v'][i]
         image_data['r_P3f_Cf_u'] = real_data['r_P3f_Cf_u'][i]
         image_data['r_P3f_Cf_v'] = real_data['r_P3f_Cf_v'][i]
-        image_data['r_Q_S_u'] = real_data['r_Q_S_u'][i]
-        image_data['r_Q_S_v'] = real_data['r_Q_S_v'][i]
+        # image_data['r_Q_S_u'] = real_data['r_Q_S_u'][i]
+        # image_data['r_Q_S_v'] = real_data['r_Q_S_v'][i]
 
         results_iteration = least_squares(
             model.residual_eqs, 
@@ -1051,3 +1083,93 @@ def generate_synthetic_data(x, bike_params, camera_params, model):
     }
 # ----- ------ ----- ----- -----
 
+
+def generate_square(N, state: list, length:float):
+    '''
+    Generate a symbolic square.
+    N: World reference frame.
+    '''
+    
+    x, y, z = sp.symbols('x, y, z')
+    phi, theta, psi = sp.symbols('phi, theta, psi')
+    bl, br, tl, tr = sp.symbols('bl, br, tl, tr', cls=me.Point)
+    l = sp.symbols('l')
+    A = me.ReferenceFrame('A')
+    O = me.Point('O')
+
+    square_vars = (l, x, y, z, phi, theta, psi)
+    subs = (length, state[0], state[1], state[2],
+            state[3], state[4], state[5])
+
+    A.orient_body_fixed(N, (psi, theta, phi), 'zyx')
+        
+    bl.set_pos(O, x*N.x + y*N.y + z*N.z)
+    br.set_pos(bl, l*A.x)
+    tl.set_pos(bl, l*A.z)
+    tr.set_pos(br, l*A.z)
+
+    corners_sym = (bl, br, tl, tr)
+
+    bl_x = bl.pos_from(O).N.x
+    bl_y = bl.pos_from(O).N.y
+    bl_z = bl.pos_from(O).N.z
+
+    br_x = br.pos_from(O).N.x
+    br_y = br.pos_from(O).N.y
+    br_z = br.pos_from(O).N.z
+
+    tl_x = tl.pos_from(O).N.x
+    tl_y = tl.pos_from(O).N.y
+    tl_z = tl.pos_from(O).N.z
+
+    tr_x = tr.pos_from(O).N.x
+    tr_y = tr.pos_from(O).N.y
+    tr_z = tr.pos_from(O).N.z
+
+    eval_f01 = sp.lambdify(square_vars, bl_x)
+    eval_f02 = sp.lambdify(square_vars, bl_y)
+    eval_f03 = sp.lambdify(square_vars, bl_z)
+
+    eval_f04 = sp.lambdify(square_vars, br_x)
+    eval_f05 = sp.lambdify(square_vars, br_y)
+    eval_f06 = sp.lambdify(square_vars, br_z)
+
+    eval_f07 = sp.lambdify(square_vars, tl_x)
+    eval_f08 = sp.lambdify(square_vars, tl_y)
+    eval_f09 = sp.lambdify(square_vars, tl_z)
+
+    eval_f10 = sp.lambdify(square_vars, tr_x)
+    eval_f11 = sp.lambdify(square_vars, tr_y)
+    eval_f12 = sp.lambdify(square_vars, tr_z)
+
+    
+    f01 = eval_f01(*subs)
+    f02 = eval_f02(*subs)
+    f03 = eval_f03(*subs)
+    
+    f04 = eval_f04(*subs)
+    f05 = eval_f05(*subs)
+    f06 = eval_f06(*subs)
+    
+    f07 = eval_f07(*subs)
+    f08 = eval_f08(*subs)
+    f09 = eval_f09(*subs)
+    
+    f10 = eval_f10(*subs)
+    f11 = eval_f11(*subs)
+    f12 = eval_f12(*subs)
+
+    bl_num = (f01, f02, f03)
+    br_num = (f04, f05, f06)
+
+    tl_num = (f07, f08, f09)
+    tr_num = (f10, f11, f12)
+
+    corners_num = (bl_num, br_num, tl_num, tr_num)
+
+    return corners_sym, corners_num
+
+def project_square(corners, camera_params):
+
+    bl, br, tl, tr = corners
+    u_bl, v_bl = perspective_projection(bl, P, C, fx, fy, cx, cy)
