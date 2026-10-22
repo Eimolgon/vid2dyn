@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from dtk.bicycle import benchmark_parameters
+import matplotlib.animation as animation
 
 def generate_symbolic_bicycle_kinematics():
     import sympy as sm
@@ -230,14 +231,16 @@ def animate_3d_bicycle(time, x_v, y_v, z_v, q3_v, q4_v, q5_v, q6_v, q7_v, q8_v,
                         interval=slow_factor/FPS*1000)
     if save:
         #ani.save("animation.gif", fps=FPS//slow_factor)
-        ani.save("animation.mp4", fps=60)
+        # ani.save("animation.mp4", fps=60)
                  #fps=FPS//slow_factor)
+        writer = animation.FFMpegWriter(fps=60)
+        ani.save("animation.mp4", writer=writer)
 
     return ani
 
 
 # df = pd.read_csv('/home/eimolgon/Documents/PhD-Project/02-video-data/260312-datacsv_bg-oslo.csv')
-df = pd.read_csv('/home/eimolgon/Documents/PhD-Project/vid2dyn/datacsv_bg.csv')
+df = pd.read_csv('/home/eimolgon/Documents/PhD-Project/vid2dyn/states_animation.csv')
 bpar = benchmark_parameters()
 # 'phi', 'theta', 'psi', 'delta', 'xr', 'yr', 'zr']
 ani = animate_3d_bicycle(

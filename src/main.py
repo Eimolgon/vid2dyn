@@ -7,17 +7,12 @@ import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import bike_model as ortpro
-import bike_model_perspective as perpro
+# import bike_model as ortpro
+# import bike_model_perspective as perpro
+import bike_model_ellipse as be
 from matplotlib.patches import Ellipse
 from scipy.optimize import least_squares
-# from bike_model import *
 from skimage.draw import ellipse_perimeter
-# from interactive import launch_interactive
-from interactive import launch_interactive
-from interactive_camera import launch_camera_view
-from interactive_viewer import launch_interactive_viewer
-
 
 from utils import (
     readFile,
@@ -105,7 +100,7 @@ focal_length = 0.028
 # }
 
 bike_params = {
-    'lr': 1.4,
+    'lr': 1.0,
     'lf1': 0.5,
     'lf2': 0.1,
     'rf': wheel_diameter/2,
@@ -113,9 +108,19 @@ bike_params = {
 }
 
 
+
+bike_params['lh'] = bike_params['lf1']                  # both hubs level
+bike_params['lr'] = WHEELBASE - bike_params['lf2']      # measure your bike
+
+
+
+
+
 # ----- Solver boundaries -----
-lower_bound = [-np.pi/2, -np.pi/2, -np.pi/2, -np.pi/2, -20.0, 0.1, -20.0]
-upper_bound = [np.pi/2, np.pi/2, np.pi/2, np.pi/2, 20.0, 20.0, 20.0]
+# phi, theta, psi, delta, x, y, z
+
+lower_bound = [-np.pi/2, -np.pi/2, -np.pi, -np.pi/2, -20.0, 0.1, 0.0]
+upper_bound = [np.pi/2, np.pi/2, np.pi, np.pi/2, 20.0, 20.0, 20.0]
 boundaries = (lower_bound, upper_bound)
 
 # camera_params = {'f': 24,
@@ -254,20 +259,20 @@ if args.single_frame != 0 :
     plot_points_f = (xf, zf, p1_f, p3_f)
     plot_points_r = (xr, zr, p1_r, p3_r)
 
-    imgdata = {
-            'r_Cf_Cr_u' : [xf - xr],
-            'r_Cf_Cr_v' : [zf - zr],
-            'u_Cr' : [xr],
-            'v_Cr' : [zr],
-            'r_P1r_Cr_u' : [p1_r[0] - xr],
-            'r_P1r_Cr_v' : [p1_r[1] - zr],
-            'r_P3r_Cr_u' : [p3_r[0] - xr],
-            'r_P3r_Cr_v' : [p3_r[1] - zr],
-            'r_P1f_Cf_u' : [p1_f[0] - xf],
-            'r_P1f_Cf_v' : [p1_f[1] - zf],
-            'r_P3f_Cf_u' : [p3_f[0] - xf],
-            'r_P3f_Cf_v' : [p3_f[1] - zf],
-            }
+    # imgdata = {
+    #         'r_Cf_Cr_u' : [xf - xr],
+    #         'r_Cf_Cr_v' : [zf - zr],
+    #         'u_Cr' : [xr],
+    #         'v_Cr' : [zr],
+    #         'r_P1r_Cr_u' : [p1_r[0] - xr],
+    #         'r_P1r_Cr_v' : [p1_r[1] - zr],
+    #         'r_P3r_Cr_u' : [p3_r[0] - xr],
+    #         'r_P3r_Cr_v' : [p3_r[1] - zr],
+    #         'r_P1f_Cf_u' : [p1_f[0] - xf],
+    #         'r_P1f_Cf_v' : [p1_f[1] - zf],
+    #         'r_P3f_Cf_u' : [p3_f[0] - xf],
+    #         'r_P3f_Cf_v' : [p3_f[1] - zf],
+    #         }
     # imgdata = {
     #     'r_Cf_Cr_u' : [xf - xr],
     #     'r_Cf_Cr_v' : [zf - zr],
@@ -327,8 +332,12 @@ if args.single_frame != 0 :
     # bike_params['rf'] = af
     # bike_params['rr'] = ar    
 
-    results_sf, state_sf = fit_img2model(imgdata, x0, bike_params, 
-                                         boundaries, camera_params, perpro)
+    #
+    imgdata = be.image_data(ellipse_front, ellipse_rear)    
+    results_sf, state_sf = be.fit_frames(imgdata, x0, bike_params, boundaries, camera_params)
+
+    # results_sf, state_sf = fit_img2model(imgdata, x0, bike_params, 
+    #                                      boundaries, camera_params, perpro)
     print(f'phi = {np.rad2deg(state_sf[-1][0]):.2f}')
     print(f'theta = {np.rad2deg(state_sf[-1][1]):.2f}')
     print(f'psi = {np.rad2deg(state_sf[-1][2]):.2f}')
@@ -338,18 +347,7 @@ if args.single_frame != 0 :
     print(f'z = {state_sf[-1][6]:.2f}')
 
 
-    if args.plot == 'interactive':
-
-        launch_interactive_viewer(
-            bike_params=bike_params,
-            camera_params=camera_params,
-            state0=x0,
-            image_points={0: front_data, 1: rear_data},
-            ellipses={0: ellipse_front, 1: ellipse_rear},
-            screen_resolution=screen_resolution
-        )
-
-    elif args.plot == 'e':
+    if args.plot == 'e':
         plt.plot(xf, zf, 'ok')
         plt.scatter(p1_f[0], p1_f[1], marker='x', color='red')
         plt.scatter(p3_f[0], p3_f[1], marker='x', color='black')
@@ -471,8 +469,10 @@ elif args.data == 'test':
         0.0                    # z_r [m]
     ])
 
-    synth_data = generate_synthetic_data(true_state, bike_params, 
-                                         camera_params, perpro)
+    # synth_data = generate_synthetic_data(true_state, bike_params, 
+    #                                      camera_params, perpro)
+
+    synth_data = be.synthetic_data(true_state, bike_params, camera_params)
 
     x0_test = np.array([
         np.deg2rad(5.0),

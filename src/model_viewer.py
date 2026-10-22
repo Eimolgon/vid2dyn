@@ -71,8 +71,9 @@ SENSOR_SIZE = (0.0235, 0.0156)
 FOCAL_LENGTH = 0.028
 WHEEL_DIAMETER = 0.6604
 
-BIKE_PARAMS = {"lr": 1.4, "lf1": 0.5, "lf2": 0.1,
+BIKE_PARAMS = {"lr": 1.4, "lf1": 0.5, "lf2": 0.1, "lh": 0.0,      # lh: head height above rear hub (0 = as in the sympy model)
                "rf": WHEEL_DIAMETER / 2, "rr": WHEEL_DIAMETER / 2}
+BP_KEYS = ("lr", "lf1", "lf2", "lh", "rr", "rf")
 
 STATE_NAMES = ("phi", "theta", "psi", "delta", "x_r", "y_r", "z_r")
 X0_MAIN = np.array([0.0, 0.0, 0.0, 0.0, 2.82, 0.1, 0.0])       # main.py, frame < 400
@@ -85,19 +86,38 @@ FEATURE_NAMES = ["r_Cf_Cr_u", "r_Cf_Cr_v", "u_Cr", "v_Cr",
 EPS_DEPTH = 1e-3
 
 
+# ---- WHERE THE SENSOR SIZE LIVES -------------------------------------------
+# Only the ratio focal_length / sensor_width matters (fx = f / sensor_w * W_px).
+# fy/fx is the pixel aspect.  If the image was resized or stretched after capture
+# (e.g. 6020x4024 -> 1920x1080) set ORIG_RES: fy/fx = (H/W) / (H0/W0), so the sensor
+# HEIGHT is not needed at all.  Override on the command line: --sensor-w-mm, --orig-res.
+ORIG_RES = (6020, 4024)            # None -> derive the aspect from SENSOR_SIZE instead
+SENSOR_W_MM = SENSOR_SIZE[0] * 1000
+
+
+def fy_over_fx(res):
+    if ORIG_RES:
+        return (res[1] / res[0]) / (ORIG_RES[1] / ORIG_RES[0])
+    return (res[1] / SENSOR_SIZE[1]) / (res[0] / SENSOR_SIZE[0])
+
+
+def f_to_px(f_mm, res):
+    return f_mm / SENSOR_W_MM * res[0]
+
+
 def default_camera(res):
-    return {"fx": FOCAL_LENGTH * res[0] / SENSOR_SIZE[0],
-            "fy": FOCAL_LENGTH * res[1] / SENSOR_SIZE[1],
+    fx = f_to_px(FOCAL_LENGTH * 1000, res)
+    return {"fx": fx, "fy": fx * fy_over_fx(res),
             "cx": res[0] / 2.0, "cy": res[1] / 2.0,
             "cam_x": 0.0, "cam_y": 0.0, "cam_z": 0.45,
             "cam_yaw": 0.0, "cam_pitch": 0.0, "cam_roll": 0.0}
 
 
-def make_bounds(psi_deg=90.0):
-    """Same bounds as main.py (single frame). psi_deg=180 lets the bike travel left."""
-    p = np.deg2rad(psi_deg)
-    lb = np.array([-np.pi / 2, -np.pi / 2, -p, -np.pi / 2, -20.0, 0.1, -20.0])
-    ub = np.array([np.pi / 2, np.pi / 2, p, np.pi / 2, 20.0, 20.0, 20.0])
+def make_bounds(psi_deg=180.0, roll_deg=90.0, steer_deg=90.0):
+    """main.py uses psi +-90 (the bike can then only travel to the RIGHT of the image)."""
+    p, r, d = np.deg2rad(psi_deg), np.deg2rad(roll_deg), np.deg2rad(steer_deg)
+    lb = np.array([-r, -np.pi / 2, -p, -d, -20.0, 0.1, -20.0])
+    ub = np.array([r, np.pi / 2, p, d, 20.0, 20.0, 20.0])
     return lb, ub
 
 
@@ -152,7 +172,7 @@ def bike_points(x, bp):
     phi, theta, psi, delta, xr, yr, zr = (float(v) for v in x[:7])
     R, F = bike_frames(phi, theta, psi, delta)
     Cr = np.array([xr, yr, zr])
-    S = Cr + bp["lr"] * R[:, 0]
+    S = Cr + bp["lr"] * R[:, 0] + bp.get("lh", 0.0) * R[:, 2]
     Q = S - bp["lf1"] * F[:, 2]
     Cf = Q + bp["lf2"] * F[:, 0]
     hr, vr = _plane_axes(R)
@@ -186,18 +206,19 @@ def project(P, cam, mask=False):
     return u, v, Yc
 
 
-def wheel_image_extremes(c, A, B, r, cam):
+def wheel_image_extremes(c, A, B, r, cam, axis="v"):
     """
     Exact image-space top / bottom points of the projected rim circle
     c + r(cos t A + sin t B). d/dt of v(t)=fy Z/Y+cy reduces to
     alpha cos t + beta sin t = gamma, so it is closed form.
-    Returns ((u,v)_top, (u,v)_bottom), NaN if the circle cannot be handled.
+    Returns ((u,v)_max, (u,v)_min) along v (top, bottom) or u (right, left), NaN if the circle cannot be handled.
     """
     C = camera_matrix(cam)
     c_c = C.T @ (c - camera_position(cam))
     A_c, B_c = C.T @ A, C.T @ B
-    y0, z0 = c_c[1], c_c[2]
-    ya, za, yb, zb = A_c[1], A_c[2], B_c[1], B_c[2]
+    kc = 2 if axis == "v" else 0                    # camera component that becomes v (top) / u (right)
+    y0, z0 = c_c[1], c_c[kc]
+    ya, za, yb, zb = A_c[1], A_c[kc], B_c[1], B_c[kc]
     al = y0 * zb - z0 * yb
     be = z0 * ya - y0 * za
     ga = r * (za * yb - zb * ya)
@@ -211,7 +232,8 @@ def wheel_image_extremes(c, A, B, r, cam):
         p = c + r * (np.cos(t) * A + np.sin(t) * B)
         u, v, _ = project(p, cam)
         out.append((float(u[0]), float(v[0])))
-    return (out[0], out[1]) if out[0][1] >= out[1][1] else (out[1], out[0])
+    i = 1 if axis == "v" else 0
+    return (out[0], out[1]) if out[0][i] >= out[1][i] else (out[1], out[0])
 
 
 def model_features(x, bp, cam, p1_mode="as coded"):
@@ -228,6 +250,16 @@ def model_features(x, bp, cam, p1_mode="as coded"):
         uv[k] = (float(u[0]), float(v[0]))
     qs = (uv["Q"][0] - uv["S"][0], uv["Q"][1] - uv["S"][1])
 
+    if p1_mode == "extremes + width":
+        o = {}
+        for w, (c, M, rad) in {"r": (pts["Cr"], R, bp["rr"]), "f": (pts["Cf"], F, bp["rf"])}.items():
+            top, bot = wheel_image_extremes(c, M[:, 0], M[:, 2], rad, cam, "v")
+            rgt, lft = wheel_image_extremes(c, M[:, 0], M[:, 2], rad, cam, "u")
+            o[w] = (((top[0] + bot[0]) / 2, (top[1] + bot[1]) / 2),
+                    ((top[0] - bot[0]) / 2, (top[1] - bot[1]) / 2),
+                    ((rgt[0] - lft[0]) / 2, (rgt[1] - lft[1]) / 2))
+        (cr, tr, rr_), (cf, tf, rf_) = o["r"], o["f"]
+        return np.array([cf[0] - cr[0], cf[1] - cr[1], cr[0], cr[1], *tr, *rr_, *tf, *rf_], float)
     if p1_mode == "as coded":
         f = [uv["Cf"][0] - uv["Cr"][0], uv["Cf"][1] - uv["Cr"][1], uv["Cr"][0], uv["Cr"][1]]
         for w in ("r", "f"):
@@ -247,8 +279,16 @@ def model_features(x, bp, cam, p1_mode="as coded"):
     return np.array(f + [qs[0], qs[1]], float)
 
 
-def residual_vector(x, data_vec, bp, cam, qs_mode="as coded", p1_mode="as coded"):
+FULL_NAMES = ["r_Cf_Cr_u", "r_Cf_Cr_v", "u_Cr", "v_Cr", "r_P1r_Cr_u", "r_P1r_Cr_v", "r_P2r_Cr_u", "r_P2r_Cr_v",
+              "r_P1f_Cf_u", "r_P1f_Cf_v", "r_P2f_Cf_u", "r_P2f_Cf_v"]
+P1_MODES = ["as coded", "image extreme", "extremes + width"]
+
+
+def residual_vector(x, data, bp, cam, qs_mode="as coded", p1_mode="as coded"):
     m = model_features(x, bp, cam, p1_mode)
+    if p1_mode == "extremes + width":          # 12 equations, no Q-S
+        return m - data["vec_full"]
+    data_vec = data["vec"]
     if qs_mode == "normalised":
         n = np.hypot(m[12], m[13])
         m = m.copy()
@@ -272,6 +312,16 @@ def qs_from_ellipses(ang_f, ang_r, th_f, th_r):
     return float(u), float(v)
 
 
+def ellipse_keypoints(e):
+    """centre, (top - centre), (right-most - centre) of the ellipse (xc, zc, a, b, theta)."""
+    xc, zc, a, b, th = (float(v) for v in e[:5])
+    s_, c_ = np.sin(th), np.cos(th)
+    dz = np.sqrt(a * a * s_ * s_ + b * b * c_ * c_)
+    dx = np.sqrt(a * a * c_ * c_ + b * b * s_ * s_)
+    k = (a * a - b * b) * s_ * c_
+    return (xc, zc), (k / dz, dz), (dx, k / dx)
+
+
 def build_data(front_n, rear_n, res):
     """front_n / rear_n: (N,2) normalised annotation points (YOLO convention, y down)."""
     ef = fitEllipse(front_n, res)
@@ -293,7 +343,11 @@ def build_data(front_n, rear_n, res):
            "r_Q_S_u": qu, "r_Q_S_v": qv}
     img = {k: float(v) for k, v in img.items()}
     px = lambda p: np.column_stack([p[:, 0] * res[0], (1 - p[:, 1]) * res[1]])
-    return {"img": img, "vec": np.array([img[k] for k in FEATURE_NAMES]),
+    (cf_, tf_, rf_), (cr_, tr_, rr_) = ellipse_keypoints(ef), ellipse_keypoints(er)
+    vec_full = np.array([cf_[0] - cr_[0], cf_[1] - cr_[1], cr_[0], cr_[1], *tr_, *rr_, *tf_, *rf_])
+    return {"img": img, "vec": np.array([img[k] for k in FEATURE_NAMES]), "vec_full": vec_full,
+            "rgt_f": (xf + rf_[0], zf + rf_[1]), "lft_f": (xf - rf_[0], zf - rf_[1]),
+            "rgt_r": (xr + rr_[0], zr + rr_[1]), "lft_r": (xr - rr_[0], zr - rr_[1]),
             "ef": (xf, zf, af, bf, tf), "er": (xr, zr, ar, br, tr),
             "p1f": p1f, "p3f": p3f, "p1r": p1r, "p3r": p3r,
             "raw_f": px(front_n), "raw_r": px(rear_n)}
@@ -354,10 +408,28 @@ def verify_against_sympy(bp, cam, n=6, seed=1):
         x = np.array([rng.uniform(-.4, .4), rng.uniform(-.4, .4), rng.uniform(-1.4, 1.4),
                       rng.uniform(-.4, .4), rng.uniform(-2, 2), rng.uniform(3, 9), rng.uniform(0, .7)])
         zero = {k: 0.0 for k in FEATURE_NAMES}
-        r_sym = perpro.residual_eqs(x, zero, bp, cam)           # = model features
-        r_np = model_features(x, bp, cam, "as coded")
+        r_sym = np.asarray(perpro.residual_eqs(x, zero, bp, cam))   # = model features
+        r_np = model_features(x, bp, cam, "as coded")[:len(r_sym)]
         worst = max(worst, float(np.nanmax(np.abs(r_sym - r_np))))
     return worst
+
+
+PERPRO_NEQ = 14          # number of residuals returned by perpro.residual_eqs (set in main)
+
+
+def perpro_n_eqs(bp, cam):
+    """12 if you removed the Q-S equations from bike_model_perspective.py, else 14."""
+    if perpro is None:
+        return 14
+    zero = {k: 0.0 for k in FEATURE_NAMES}
+    return len(perpro.residual_eqs(np.array([0, 0, 0.3, 0, 0, 5.0, 0.3]), zero, bp, cam))
+
+
+def solver_matches_perpro(qs_mode, p1_mode, bp=None):
+    """True when the selected formulation is exactly what perpro.residual_eqs computes."""
+    if perpro is None or p1_mode != "as coded" or (bp is not None and bp.get("lh", 0.0) != 0.0):
+        return False
+    return qs_mode == ("off" if PERPRO_NEQ == 12 else "as coded")
 
 
 # ---------------------------------------------------------------------------
@@ -394,7 +466,7 @@ class BikeLayer:
             self.p13_2 = [e2(marker="o", color="red", label="model P1 (as coded)", **ms),
                           e2(marker="o", color="k", label="model P3 (as coded)", **ms)]
             self.ext_2 = e2(ls="", marker="D", ms=6, mfc="none", mec="#009E73", mew=1.4,
-                            label="true image top/bottom of rim")
+                            label="model: image extremes of rim (top/bottom/left/right)")
             self.hub_2 = e2(ls="", marker="+", ms=11, mew=1.8, color="#7A00B8",
                             label="model hubs Cr, Cf")
             self.qs_model = e2(color="#D55E00", lw=2.2, label="Q-S model (normalised, 60 px)")
@@ -417,8 +489,7 @@ class BikeLayer:
                 ln.set_data([sc["uv"][k[0]][0], sc["uv"][k[1]][0]],
                             [sc["uv"][k[0]][1], sc["uv"][k[1]][1]])
             e = sc["ext"]
-            self.ext_2.set_data([e[0][0][0], e[0][1][0], e[1][0][0], e[1][1][0]],
-                                [e[0][0][1], e[0][1][1], e[1][0][1], e[1][1][1]])
+            self.ext_2.set_data([p[0] for w in e for p in w], [p[1] for w in e for p in w])
             self.hub_2.set_data([sc["uv"]["Cr"][0], sc["uv"]["Cf"][0]],
                                 [sc["uv"]["Cr"][1], sc["uv"]["Cf"][1]])
             q = np.array(sc["uv"]["Q"]) - np.array(sc["uv"]["S"])
@@ -450,7 +521,9 @@ def compute_scene(x, bp, cam):
         u, v, _ = project(sc[k], cam, mask=True)
         sc[k + "_uv"] = (u, v)
     sc["ext"] = (wheel_image_extremes(pts["Cr"], R[:, 0], R[:, 2], bp["rr"], cam),
-                 wheel_image_extremes(pts["Cf"], F[:, 0], F[:, 2], bp["rf"], cam))
+                 wheel_image_extremes(pts["Cf"], F[:, 0], F[:, 2], bp["rf"], cam),
+                 wheel_image_extremes(pts["Cr"], R[:, 0], R[:, 2], bp["rr"], cam, "u"),
+                 wheel_image_extremes(pts["Cf"], F[:, 0], F[:, 2], bp["rf"], cam, "u"))
     return sc
 
 
@@ -471,7 +544,7 @@ STATE_SLIDERS = [  # key, label, min, max, step   (angles in deg)
 class Viewer:
     def __init__(self, data, bp, cam0, state0, res, bounds, out_path,
                  true_state=None, qs_mode="as coded", p1_mode="as coded"):
-        self.data, self.bp, self.cam0, self.res = data, bp, dict(cam0), res
+        self.data, self.bp, self.cam0, self.res = data, dict(bp), dict(cam0), res
         self.bounds, self.out_path, self.true_state = bounds, out_path, true_state
         self.qs_mode, self.p1_mode = qs_mode, p1_mode
         self.suspend = False
@@ -523,6 +596,12 @@ class Viewer:
             ax2.plot([d["p3r"][0], d["p3f"][0]], [d["p3r"][1], d["p3f"][1]], marker="x", ms=8, mew=2,
                      color="k", label="data: P3 (ellipse bottom)", **kp)[0],
         ]
+        self.data_artists.append(ax2.plot(
+            [d["rgt_r"][0], d["rgt_f"][0]], [d["rgt_r"][1], d["rgt_f"][1]], marker=">", ms=7, mfc="#E69F00",
+            mec="k", label="data: ellipse right extreme", **kp)[0])
+        self.data_artists.append(ax2.plot(
+            [d["lft_r"][0], d["lft_f"][0]], [d["lft_r"][1], d["lft_f"][1]], marker="<", ms=7, mfc="#E69F00",
+            mec="k", label="data: ellipse left extreme", **kp)[0])
         # data Q-S direction (unit vector, drawn 60 px long from the model S)
         self.qs_data, = ax2.plot([], [], color="k", lw=2.2, label="Q-S data (unit vector, 60 px)", zorder=6)
         self.data_artists.append(self.qs_data)
@@ -551,7 +630,7 @@ class Viewer:
         # legends
         h, l = ax2.get_legend_handles_labels()
         extra = [self.main.p13_2[0], self.main.p13_2[1], self.main.ext_2, self.main.hub_2, self.main.qs_model]
-        keep = [(x, y) for x, y in zip(h, l) if not y.startswith("model P") and "image top" not in y
+        keep = [(x, y) for x, y in zip(h, l) if not y.startswith("model P") and "image extremes" not in y
                 and "hubs" not in y and not y.startswith("Q-S model")]
         keep += [(x, x.get_label()) for x in extra]
         ax2.legend([k[0] for k in keep], [k[1] for k in keep], fontsize=6.5, loc="upper left",
@@ -567,6 +646,7 @@ class Viewer:
     # ------------------------------------------------------------------ widgets
     def _build_widgets(self, state0):
         fig = self.fig
+        ROW = 0.0375
         self.sliders = {}
         c = self.cam0
         W, H = self.res
@@ -584,14 +664,23 @@ class Viewer:
         s0 = np.asarray(state0, float)
         init = np.r_[np.rad2deg(s0[:4]), s0[4:]]
         for i, (k, lab, lo, hi, st) in enumerate(STATE_SLIDERS):
-            add_slider(0.095, 0.325 - i * 0.0415, 0.15, k, lab, lo, hi, init[i], st)
+            add_slider(0.095, 0.325 - i * ROW, 0.15, k, lab, lo, hi, init[i], st)
 
         fig.text(0.285, 0.358, "CAMERA  intrinsics", fontsize=9, weight="bold")
-        intr = [("fx", "fx [px]", c["fx"] * 0.25, c["fx"] * 3, 1.0), ("fy", "fy [px]", c["fy"] * 0.25, c["fy"] * 3, 1.0),
-                ("cx", "cx [px]", 0, 2 * c["cx"], 1.0), ("cy", "cy [px]", 0, 2 * c["cy"], 1.0)]
-        for i, (k, lab, lo, hi, st) in enumerate(intr):
-            add_slider(0.335, 0.325 - i * 0.0415, 0.13, k, lab, lo, hi, c[k], st)
-        fig.text(0.285, 0.148, "(fx, fy from f=28 mm / sensor 23.5x15.6 mm)", fontsize=6.5, color="0.4")
+        f0 = c["fx"] / self.res[0] * SENSOR_W_MM
+        intr = [("f", "f [mm]", 5.0, 120.0, 0.1, f0),
+                ("cx", "cx [px]", 0, 2 * c["cx"], 1.0, c["cx"]), ("cy", "cy [px]", 0, 2 * c["cy"], 1.0, c["cy"])]
+        for i, (k, lab, lo, hi, st, v0) in enumerate(intr):
+            add_slider(0.335, 0.325 - i * ROW, 0.13, k, lab, lo, hi, v0, st)
+        self.f_text = fig.text(0.335, 0.325 - 3 * ROW + 0.004, "", fontsize=7.5, color="0.35")
+        fig.text(0.285, 0.1745, "BIKE GEOMETRY [m]  (hub-to-hub = lr + lf2)", fontsize=9, weight="bold")
+        geo = [("lr", "lr  rear hub -> head", 0.3, 2.0, 0.005), ("lf1", "lf1 head -> fork bottom", -0.2, 1.0, 0.005),
+               ("lf2", "lf2 fork offset", -0.2, 0.5, 0.005), ("lh", "lh head height > hub", 0.0, 1.0, 0.005)]
+        for i, (k, lab, lo, hi, st) in enumerate(geo):
+            add_slider(0.335, 0.325 - (5 + i) * ROW, 0.13, k, lab, lo, hi, self.bp[k], st)
+        fig.text(0.50, 0.1015, "WHEELS [m]", fontsize=9, weight="bold")
+        for i, (k, lab) in enumerate((("rr", "rr rear radius"), ("rf", "rf front radius"))):
+            add_slider(0.555, 0.325 - (7 + i) * ROW, 0.13, k, lab, 0.2, 0.5, self.bp[k], 0.001)
 
         fig.text(0.50, 0.358, "CAMERA  extrinsics (pose in N)", fontsize=9, weight="bold")
         ext = [("cam_x", "cam_x [m]", -5, 5, 0.01), ("cam_y", "cam_y [m]", -5, 5, 0.01),
@@ -600,7 +689,7 @@ class Viewer:
                ("cam_roll", "roll [deg]", -45, 45, 0.1)]
         for i, (k, lab, lo, hi, st) in enumerate(ext):
             v = c[k] if k in ("cam_x", "cam_y", "cam_z") else np.rad2deg(c[k])
-            add_slider(0.555, 0.325 - i * 0.0415, 0.13, k, lab, lo, hi, v, st)
+            add_slider(0.555, 0.325 - i * ROW, 0.13, k, lab, lo, hi, v, st)
 
         # buttons ----------------------------------------------------------
         def add_button(rect, text, cb, color="#E8EEF7"):
@@ -622,9 +711,8 @@ class Viewer:
         self.radio_qs = RadioButtons(ax, ["as coded", "normalised", "off"],
                                      active=["as coded", "normalised", "off"].index(self.qs_mode))
         ax = fig.add_axes([0.855, 0.085, 0.125, 0.105])
-        ax.set_title("P1/P3 definition (table + Solve)", fontsize=7, pad=2)
-        self.radio_p1 = RadioButtons(ax, ["as coded", "image extreme"],
-                                     active=["as coded", "image extreme"].index(self.p1_mode))
+        ax.set_title("residual set (table + Solve)", fontsize=7, pad=2)
+        self.radio_p1 = RadioButtons(ax, P1_MODES, active=P1_MODES.index(self.p1_mode))
         for r in (self.radio_qs, self.radio_p1):
             for t in r.labels:
                 t.set_fontsize(7.5)
@@ -647,7 +735,8 @@ class Viewer:
 
     def get_cam(self):
         s = self.sliders
-        return {"fx": s["fx"].val, "fy": s["fy"].val, "cx": s["cx"].val, "cy": s["cy"].val,
+        fx = f_to_px(s["f"].val, self.res)
+        return {"fx": fx, "fy": fx * fy_over_fx(self.res), "cx": s["cx"].val, "cy": s["cy"].val,
                 "cam_x": s["cam_x"].val, "cam_y": s["cam_y"].val, "cam_z": s["cam_z"].val,
                 "cam_yaw": np.deg2rad(s["cam_yaw"].val), "cam_pitch": np.deg2rad(s["cam_pitch"].val),
                 "cam_roll": np.deg2rad(s["cam_roll"].val)}
@@ -667,6 +756,11 @@ class Viewer:
     def set_cam(self, cam):
         self.suspend = True
         for k, v in cam.items():
+            if k == "fy":
+                continue
+            if k == "fx":
+                self._set_slider("f", v / self.res[0] * SENSOR_W_MM)
+                continue
             self._set_slider(k, v if k in ("fx", "fy", "cx", "cy", "cam_x", "cam_y", "cam_z") else np.rad2deg(v))
         self.suspend = False
         self.update()
@@ -703,17 +797,16 @@ class Viewer:
 
     def solver_fun(self, cam):
         data = self.data
-        if self.qs_mode == "as coded" and self.p1_mode == "as coded" and perpro is not None:
+        if solver_matches_perpro(self.qs_mode, self.p1_mode, self.bp):
             return lambda x: perpro.residual_eqs(x, data["img"], self.bp, cam)
-        return lambda x: residual_vector(x, data["vec"], self.bp, cam, self.qs_mode, self.p1_mode)
+        return lambda x: residual_vector(x, data, self.bp, cam, self.qs_mode, self.p1_mode)
 
     def solve(self, _=None):
         lb, ub = self.bounds
         x_start = self.get_state()
         x0 = np.clip(x_start, lb + 1e-9, ub - 1e-9)
         cam = self.get_cam()
-        src = "perpro.residual_eqs" if (self.qs_mode == "as coded" and self.p1_mode == "as coded"
-                                         and perpro is not None) else "numpy copy"
+        src = "perpro.residual_eqs" if solver_matches_perpro(self.qs_mode, self.p1_mode, self.bp) else "numpy copy"
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -756,6 +849,8 @@ class Viewer:
                    "x0_units": "phi,theta,psi,delta in rad; x_r,y_r,z_r in m",
                    "x0_deg_m": {n: float(v) for n, v in zip(STATE_NAMES, np.r_[np.rad2deg(x[:4]), x[4:]])},
                    "camera_params": {k: float(v) for k, v in cam.items()},
+                   "focal_mm": float(self.sliders["f"].val), "sensor_width_mm": SENSOR_W_MM,
+                   "orig_res": ORIG_RES, "hfov_deg": float(np.rad2deg(2 * np.arctan(self.res[0] / 2 / cam["fx"]))),
                    "bike_params": {k: float(v) for k, v in self.bp.items()}}
         with open(self.out_path, "w") as fh:
             json.dump(payload, fh, indent=2)
@@ -771,8 +866,11 @@ class Viewer:
     def update(self, _=None):
         if self.suspend:
             return
+        for k in BP_KEYS:
+            self.bp[k] = float(self.sliders[k].val)
         x, cam, bp = self.get_state(), self.get_cam(), self.bp
         sc = compute_scene(x, bp, cam)
+        self.f_text.set_text(f"fx={cam['fx']:.0f}px  fy={cam['fy']:.0f}px  HFOV={np.rad2deg(2*np.arctan(self.res[0]/2/cam['fx'])):.1f} deg")
         self.main.set(sc, cam)
         if self.ghost_state is not None:
             self.ghost.set(compute_scene(self.ghost_state, bp, cam), cam)
@@ -815,7 +913,9 @@ class Viewer:
         d = self.data
         q = np.array([d["img"]["r_Q_S_u"], d["img"]["r_Q_S_v"]])
         s = sc["uv"]["S"]
-        if self.show_data and np.all(np.isfinite(q)) and np.all(np.isfinite(s)):
+        qs_used = self.p1_mode != "extremes + width"
+        self.main.qs_model.set_visible(qs_used)
+        if qs_used and self.show_data and np.all(np.isfinite(q)) and np.all(np.isfinite(s)):
             self.qs_data.set_data([s[0], s[0] + 60 * q[0]], [s[1], s[1] + 60 * q[1]])
         else:
             self.qs_data.set_data([], [])
@@ -833,25 +933,29 @@ class Viewer:
 
     def _update_text(self, x, cam, sc):
         d, lb, ub = self.data, *self.bounds
-        res = residual_vector(x, d["vec"], self.bp, cam, self.qs_mode, self.p1_mode)
+        res = residual_vector(x, d, self.bp, cam, self.qs_mode, self.p1_mode)
         m = model_features(x, self.bp, cam, self.p1_mode)
-        if self.qs_mode == "normalised":
+        if self.qs_mode == "normalised" and self.p1_mode != "extremes + width":
             n = np.hypot(m[12], m[13])
             if n > 0:
                 m = m.copy()
                 m[12:] /= n
-        names = FEATURE_NAMES[:len(res)]
+        full = self.p1_mode == "extremes + width"
+        names = FULL_NAMES if full else FEATURE_NAMES[:len(res)]
+        dvec = d["vec_full"] if full else d["vec"]
         tot = np.nansum(res ** 2)
         cost = 0.5 * tot
         deg = np.rad2deg(x[:4])
         lines = ["x0 = [phi %.1f, theta %.1f, psi %.1f, delta %.1f] deg" % tuple(deg),
                  "     [x_r %.2f, y_r %.2f, z_r %.2f] m" % tuple(x[4:]),
                  "",
-                 f"Q-S eqs : {self.qs_mode:11s} P1/P3 : {self.p1_mode}",
+                 "bike: " + " ".join(f"{k}={self.bp[k]:.3f}" for k in ("lr", "lf1", "lf2", "lh")),
+                 f"       wheelbase(d=0) = lr+lf2 = {self.bp['lr'] + self.bp['lf2']:.3f} m",
+                 f"Q-S eqs : {'(unused)' if full else self.qs_mode:11s} residuals : {self.p1_mode}",
                  f"cost = 0.5*sum(res^2) = {cost:,.1f}",
                  "",
                  f"{'eq':3s} {'name':11s} {'model':>9s} {'data':>9s} {'res':>9s} {'share':>5s}"]
-        for i, (n, mv, dv, r) in enumerate(zip(names, m, d["vec"], res)):
+        for i, (n, mv, dv, r) in enumerate(zip(names, m, dvec, res)):
             share = 100 * r * r / tot if tot > 0 else 0
             lines.append(f"f{i + 1:02d} {n[:11]:11s} {mv:9.2f} {dv:9.2f} {r:9.2f} {share:4.0f}%")
         warn = []
@@ -868,9 +972,9 @@ class Viewer:
         behind = [k for k in ("Cr", "Cf", "S", "Q") if np.isnan(sc["uv"][k][0])]
         if behind:
             warn.append("behind the camera: " + ",".join(behind))
-        if np.any(np.isnan(sc["pts"]["P1r"])) or np.any(np.isnan(sc["pts"]["P1f"])):
+        if not full and (np.any(np.isnan(sc["pts"]["P1r"])) or np.any(np.isnan(sc["pts"]["P1f"]))):
             warn.append("wheel axle || N.x: u_hor undefined (NaN in the model)")
-        if self.qs_mode == "as coded" and np.isfinite(res).all():
+        if not full and self.qs_mode == "as coded" and np.isfinite(res).all():
             q = np.hypot(d["img"]["r_Q_S_u"], d["img"]["r_Q_S_v"])
             mq = np.hypot(m[12], m[13])
             if mq > 5 * max(q, 1e-9) and q <= 1.5:
@@ -901,19 +1005,39 @@ def main():
                     help="initial slider state (angles in degrees, positions in m). "
                          "Default: closed-form auto-guess from the data")
     ap.add_argument("--out", default="x0_guess.json", help="where 'Export x0' writes the json")
-    ap.add_argument("--psi-bound-deg", type=float, default=90.0,
-                    help="|psi| bound used by Solve (main.py uses 90)")
+    ap.add_argument("--psi-bound-deg", type=float, default=180.0,
+                    help="|psi| bound used by Solve (main.py uses 90, which cannot represent a bike "
+                         "travelling to the left of the image)")
+    ap.add_argument("--roll-bound-deg", type=float, default=90.0)
+    ap.add_argument("--steer-bound-deg", type=float, default=90.0)
+    ap.add_argument("--bike", nargs=6, type=float, default=None, metavar=("LR", "LF1", "LF2", "LH", "RR", "RF"),
+                    help="bike geometry in m (lh = head height above the rear hub; use lh=lf1 for level hubs)")
+    ap.add_argument("--focal-mm", type=float, default=None, help="initial focal length of the f slider [mm]")
+    ap.add_argument("--sensor-w-mm", type=float, default=None, help="sensor WIDTH in mm (default 23.5)")
+    ap.add_argument("--orig-res", nargs=2, type=int, default=None, metavar=("W0", "H0"),
+                    help="resolution of the original capture if the image was resized (default 6020 4024)")
     ap.add_argument("--noise", type=float, default=0.5, help="px noise of the synthetic annotation")
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--qs", choices=["as coded", "normalised", "off"], default="as coded")
-    ap.add_argument("--p1", choices=["as coded", "image extreme"], default="as coded")
+    ap.add_argument("--qs", choices=["as coded", "normalised", "off"], default="as coded",
+                    help="Q-S equations; auto-set to 'off' if your residual_eqs has only 12 residuals")
+    ap.add_argument("--p1", choices=P1_MODES, default="extremes + width",
+                    help="residual formulation (default: the recommended one, see bike_model_ellipse.py)")
     ap.add_argument("--solve", action="store_true", help="press 'Solve' once at start-up")
     ap.add_argument("--screenshot", help="save a PNG and exit (headless)")
     ap.add_argument("--no-verify", action="store_true")
     args = ap.parse_args()
 
+    global SENSOR_W_MM, ORIG_RES, FOCAL_LENGTH
+    if args.sensor_w_mm:
+        SENSOR_W_MM = args.sensor_w_mm
+    if args.orig_res:
+        ORIG_RES = tuple(args.orig_res)
+    if args.focal_mm:
+        FOCAL_LENGTH = args.focal_mm / 1000
     res = tuple(args.res)
     bp = dict(BIKE_PARAMS)
+    if args.bike:
+        bp.update(dict(zip(("lr", "lf1", "lf2", "lh", "rr", "rf"), args.bike)))
     cam = default_camera(res)
 
     true_state = None
@@ -926,8 +1050,14 @@ def main():
               f"(truth: {np.round(np.r_[np.rad2deg(true_state[:4]), true_state[4:]], 2).tolist()})")
     data = build_data(front_n, rear_n, res)
 
+    global PERPRO_NEQ
+    PERPRO_NEQ = perpro_n_eqs(bp, cam)
+    if PERPRO_NEQ == 12 and args.qs == "as coded":
+        args.qs = "off"
+        print("[info] bike_model_perspective.residual_eqs has 12 residuals (no Q-S): using --qs off")
+
     if not args.no_verify and perpro is not None:
-        worst = verify_against_sympy(bp, cam)
+        worst = verify_against_sympy({**bp, "lh": 0.0}, cam)   # the sympy model has no lh
         print(f"[check] numpy model vs lambdified sympy model: max |diff| = {worst:.2e} px "
               f"({'OK' if worst < 1e-6 else 'MISMATCH - the viewer does not show what the solver sees!'})")
 
@@ -940,7 +1070,10 @@ def main():
               f"{np.round(np.r_[np.rad2deg(state0[:4]), state0[4:]], 2).tolist()}  "
               "(use the 'main.py's x0' button to see your old guess)")
 
-    viewer = Viewer(data, bp, cam, state0, res, make_bounds(args.psi_bound_deg), args.out,
+    if data["ef"][0] < data["er"][0] and args.psi_bound_deg < 180:
+        print("[warn] the front wheel is LEFT of the rear wheel (bike travelling left) but |psi| is bounded "
+              f"to {args.psi_bound_deg:.0f} deg: the model cannot represent this pose.")
+    viewer = Viewer(data, bp, cam, state0, res, make_bounds(args.psi_bound_deg, args.roll_bound_deg, args.steer_bound_deg), args.out,
                     true_state=true_state, qs_mode=args.qs, p1_mode=args.p1)
     if args.solve:
         viewer.solve()

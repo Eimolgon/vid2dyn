@@ -14,3 +14,6 @@ dependencies:
   - pandas==2.3.3
   - ipykernel==6.29.5
   - pytest==9.1.1
+  - symmeplot
+  - dynamicisttoolkit
+  - ffmpeg
