@@ -114,8 +114,6 @@ bike_params['lr'] = WHEELBASE - bike_params['lf2']      # measure your bike
 
 
 
-
-
 # ----- Solver boundaries -----
 # phi, theta, psi, delta, x, y, z
 
