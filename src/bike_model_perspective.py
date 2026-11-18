@@ -83,9 +83,6 @@ fx, fy, cx, cy = sp.symbols('fx, fy, cx, cy')
 cam_x, cam_y, cam_z = sp.symbols('cam_x cam_y cam_z')
 cam_yaw, cam_pitch, cam_roll = sp.symbols('cam_yaw cam_pitch cam_roll')
 
-# The camera reference frame has x right, y up, z depth
-# The bike reference frame has x depth, y left, z up
-
 
 variables = (phi, theta, psi, delta, 
              x_r, y_r, z_r, 

@@ -17,3 +17,4 @@ dependencies:
   - symmeplot
   - dynamicisttoolkit
   - ffmpeg
+  - pandas
