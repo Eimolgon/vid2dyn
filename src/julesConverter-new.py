@@ -2,8 +2,11 @@
 import pandas as pd
 from pathlib import Path
 
-source = Path("julesFiltered_gopro_test_1_1.csv")
-destination = Path("states_jf_gopro_test_1_1.csv")
+# source = Path("julesFiltered_gopro_test_1_1.csv")
+# destination = Path("states_jf_gopro_test_1_1.csv")
+
+source = Path("segmentationJules.csv")
+destination = Path("segmentation_Jules2.csv")
 
 df = pd.read_csv(source)
 

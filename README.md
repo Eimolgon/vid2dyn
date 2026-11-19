@@ -6,12 +6,12 @@ Video2Data
 
 Default fps = 30
 
-- Usage: python sequence_fit.py <dir> --orig-res 6020x4024 --out states.csv. 
+- Usage: 
+    `python sequence_fit.py <dir> --orig-res 6020x4024 --out states.csv` 
 It writes a CSV (smoothed and raw states, per-frame residual) plus a QA plot, 
 sequence_qa_demo.png for the demo.
 
-- python animate_csv.py states.csv --wheelbase 1.11 --wheel-diameter 0.6604 
---cam-height 0.45 --hfov-deg 45.5 --out bike.mp4
+- `python animate_csv.py states.csv --wheelbase 1.11 --wheel-diameter 0.6604 --cam-height 0.45 --hfov-deg 45.5 --out bike.mp4`
 
 To run the viewer
 `python src/model_viewer.py`
