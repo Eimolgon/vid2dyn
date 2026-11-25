@@ -1,5 +1,5 @@
-Video2Data
-==========
+Video2Dyn
+=========
 
 - To convert the .csv output to Jules' code 
 `python src/julesConverter.py --input path/data.csv --output path/output.csv --fps 30.0`
